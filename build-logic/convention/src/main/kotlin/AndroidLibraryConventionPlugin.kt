@@ -49,6 +49,8 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
                     "androidTestImplementation",
                     libs.findLibrary("androidx.espresso.core").get()
                 )
+                add("testImplementation", libs.findLibrary("mockk").get())
+                add("testImplementation", libs.findLibrary("kotlinx.coroutines.test").get())
             }
         }
     }
