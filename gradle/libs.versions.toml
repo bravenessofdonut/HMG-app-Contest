@@ -39,6 +39,8 @@ mockwebserver = "4.12.0"
 mockk = "1.13.8"
 
 navigationCompose = "2.9.8"
+appcompat = "1.8.0"
+material = "1.14.0"
 
 [libraries]
 # 빌드 로직에서 사용하는 Gradle 플러그인 의존성
@@ -106,6 +108,8 @@ mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
 androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycleRuntimeKtx" }
 androidx-lifecycle-viewmodel-ktx = { module = "androidx.lifecycle:lifecycle-viewmodel-ktx", version.ref = "lifecycleRuntimeKtx" }
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 
 
 [plugins]

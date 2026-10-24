@@ -26,3 +26,5 @@ dependencyResolutionManagement {
 rootProject.name = "DrivingApplication"
 include(":app")
 include(":data-resource")
+include(":presentation")
+include(":domain")
