@@ -8,7 +8,6 @@ hilt = "2.59.2"
 # Android / Compose
 coreKtx = "1.19.1"
 lifecycleRuntimeKtx = "2.11.0"
-lifecycleViewmodelCompose = "2.8.4"
 activityCompose = "1.13.0"
 composeBom = "2026.02.01"
 hiltNavigationCompose = "1.1.0"
@@ -39,6 +38,7 @@ espressoCore = "3.7.0"
 mockwebserver = "4.12.0"
 mockk = "1.13.8"
 
+navigationCompose = "2.9.8"
 
 [libraries]
 # 빌드 로직에서 사용하는 Gradle 플러그인 의존성
@@ -49,7 +49,7 @@ kotlin-serialization-gradlePlugin = { module = "org.jetbrains.kotlin:kotlin-seri
 # Android
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
 androidx-lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
-androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycleViewmodelCompose" }
+androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycleRuntimeKtx" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
 
 # Compose
@@ -101,6 +101,11 @@ androidx-test-runner = { module = "androidx.test:runner", version.ref = "junitVe
 androidx-espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "espressoCore" }
 mockwebserver = { module = "com.squareup.okhttp3:mockwebserver", version.ref = "mockwebserver" }
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
+
+# 네비게이션
+androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
+androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycleRuntimeKtx" }
+androidx-lifecycle-viewmodel-ktx = { module = "androidx.lifecycle:lifecycle-viewmodel-ktx", version.ref = "lifecycleRuntimeKtx" }
 
 
 [plugins]

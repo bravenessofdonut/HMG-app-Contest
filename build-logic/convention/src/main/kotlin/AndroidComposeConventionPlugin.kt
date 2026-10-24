@@ -76,6 +76,10 @@ class AndroidComposeConventionPlugin : Plugin<Project> {
                 "implementation",
                 libs.findLibrary("androidx.lifecycle.runtime.ktx").get()
             )
+            add(
+                "implementation",
+                libs.findLibrary("androidx.lifecycle.runtime.compose").get()
+            )
 
             // 디버그 / 미리보기
             add(
