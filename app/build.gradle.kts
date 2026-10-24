@@ -23,5 +23,6 @@ android {
 }
 
 dependencies {
+    implementation(project(":presentation"))
     implementation(libs.androidx.hilt.navigation.compose)
 }
