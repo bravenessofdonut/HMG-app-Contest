@@ -20,6 +20,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven { url = uri("https://nexus-playground.pleos.ai/repository/maven-releases/") }
     }
 }
 
@@ -28,3 +29,5 @@ include(":app")
 include(":data-resource")
 include(":presentation")
 include(":domain")
+include(":vehicle-data")
+include(":vehicle-local")

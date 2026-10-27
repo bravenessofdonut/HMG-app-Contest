@@ -85,5 +85,6 @@ fun <T> Flow<T>.asDataResourceFlow(): Flow<DataResource<T>> =
 }.onStart {
     emit(DataResource.loading())
 }.catch { e ->
+    if (e is kotlinx.coroutines.CancellationException) throw e
     emit(DataResource.error(e))
 }

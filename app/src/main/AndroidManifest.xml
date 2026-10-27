@@ -2,7 +2,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- AAOS 차량속도: 위험 권한이므로 실행 중에도 사용자 승인이 필요할 수 있음 -->
+    <uses-permission android:name="android.car.permission.CAR_SPEED" />
+    <!-- Pleos Vehicle SDK: Door Position 읽기/구독 용도로만 사용 -->
+    <uses-permission android:name="pleos.car.permission.CAR_DOORS" />
+    <uses-feature android:name="android.hardware.type.automotive" android:required="false" />
+
     <application
+        android:name=".DrivingApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -22,6 +29,9 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <meta-data
+                android:name="distractionOptimized"
+                android:value="true" />
         </activity>
     </application>
 

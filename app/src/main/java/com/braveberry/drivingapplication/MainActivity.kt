@@ -1,47 +1,55 @@
 package com.braveberry.drivingapplication
 
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.braveberry.drivingapplication.ui.theme.DrivingApplicationTheme
+import com.braveberry.presentation.navigation.DrivingNavHost
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    private var speedPermissionGranted by mutableStateOf(false)
+
+    private val requestSpeedPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> speedPermissionGranted = granted }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        speedPermissionGranted = hasSpeedPermission()
         enableEdgeToEdge()
         setContent {
             DrivingApplicationTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                DrivingNavHost(
+                    speedPermissionGranted = speedPermissionGranted,
+                    onRequestSpeedPermission = {
+                        if (hasSpeedPermission()) {
+                            speedPermissionGranted = true
+                        } else {
+                            requestSpeedPermission.launch(SPEED_PERMISSION)
+                        }
+                    }
+                )
             }
         }
     }
-}
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
+    override fun onResume() {
+        super.onResume()
+        speedPermissionGranted = hasSpeedPermission()
+    }
 
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    DrivingApplicationTheme {
-        Greeting("Android")
+    private fun hasSpeedPermission(): Boolean =
+        checkSelfPermission(SPEED_PERMISSION) == PackageManager.PERMISSION_GRANTED
+
+    private companion object {
+        const val SPEED_PERMISSION = "android.car.permission.CAR_SPEED"
     }
 }
