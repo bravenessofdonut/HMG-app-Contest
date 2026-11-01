@@ -244,8 +244,14 @@ class VoiceSessionImpl(
                 if (event == VoiceEvent.Listening && state.value.listeningPhase !in
                     setOf(ListeningPhase.REQUESTED, ListeningPhase.INPUT_READY)) return
                 if (event == VoiceEvent.ListeningStopped && !state.value.recognitionActive) return
-                if (event == VoiceEvent.TtsReady) disarm()
-                if (event == VoiceEvent.SttReady) disarmStt()
+                if (event == VoiceEvent.TtsReady) {
+                    if (state.value.ttsStatus != EngineStatus.INITIALIZING) return
+                    disarm()
+                }
+                if (event == VoiceEvent.SttReady) {
+                    if (state.value.sttStatus != EngineStatus.INITIALIZING) return
+                    disarmStt()
+                }
                 if (event == VoiceEvent.Listening) disarmStt()
                 if (event == VoiceEvent.ListeningStopped) disarmStt()
                 current.value = current.value.applyEvent(event)

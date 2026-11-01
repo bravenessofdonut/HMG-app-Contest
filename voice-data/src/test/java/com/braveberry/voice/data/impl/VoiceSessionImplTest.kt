@@ -51,7 +51,7 @@ class VoiceSessionImplTest {
         assertEquals(1, engine.releases)
     }
 
-    @Test fun missingCompletionCallbackFailsRatherThanAdvancing() = runTest {
+    @Test fun duplicateTtsReadyDoesNotCancelPlaybackTimeout() = runTest {
         val engine = FakeEngine()
         val session = VoiceSessionImpl({ engine }, backgroundScope)
         session.acquire()
@@ -59,6 +59,8 @@ class VoiceSessionImplTest {
         session.previewDialogue("first", "second", "eunwoo", "haeun")
         runCurrent()
         engine.send(VoiceEvent.Speaking)
+        runCurrent()
+        engine.send(VoiceEvent.TtsReady)
         runCurrent()
         advanceTimeBy(20_000)
         runCurrent()
@@ -117,6 +119,20 @@ class VoiceSessionImplTest {
         session.previewDialogue("bonjour", "hello", "sabine", "eunwoo")
         runCurrent()
         assertEquals(listOf("init"), engine.calls)
+    }
+
+    @Test fun duplicateSttReadyDoesNotCancelRecognitionStartTimeout() = runTest {
+        val engine = FakeEngine()
+        val session = VoiceSessionImpl({ engine }, backgroundScope)
+        session.acquire()
+        runCurrent()
+        session.startListening()
+        runCurrent()
+        engine.send(VoiceEvent.SttReady)
+        runCurrent()
+        advanceTimeBy(5_001)
+        runCurrent()
+        assertEquals("STT_START_TIMEOUT", session.state.value.sttError)
     }
 
     private class FakeEngine : VoiceRepository {
