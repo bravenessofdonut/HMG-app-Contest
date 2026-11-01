@@ -21,6 +21,20 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 
+/** 문서상 SDK 문자열 화자 목록. 앱에 없는 값은 SDK로 전달하지 않음. */
+private val documentedSpeakerLocales: Map<String, Locale> = linkedMapOf(
+    "seowoon" to Locale.KOREA,
+    "eunwoo" to Locale.KOREA,
+    "haeun" to Locale.KOREA,
+    "sanghyeok" to Locale.KOREA,
+    "lyra" to Locale.US,
+    "finley" to Locale.US,
+    "iris" to Locale("es", "ES"),
+    "arlo" to Locale("es", "ES"),
+    "sabine" to Locale.FRANCE,
+    "noah" to Locale.FRANCE
+)
+
 /** Pleos Connect Speech Service와 직접 통신하는 유일한 경계. */
 class PleosVoiceDataSourceImpl @Inject constructor(
     @ApplicationContext context: Context
@@ -125,11 +139,7 @@ class PleosVoiceDataSourceImpl @Inject constructor(
         runCatching { tts.speak(text) }.onFailure { fail(VoiceEvent.Engine.TTS, it) }
     }
 
-    /**
-     * SDK 3.3.1에 setSpeakerType은 존재하지만 공개 문서에 인자와 음성 목록이 없음.
-     * 앱 실행 시 SDK의 공개 시그니처를 확인하고, enum일 때만 목록을 자동 제공함.
-     * 타입을 추측해 임의의 남/여 음성 번호를 주입하지 않음.
-     */
+    /** SDK 3.3.1의 공개 시그니처를 확인하고 문서상 문자열 화자 또는 enum 값만 노출함. */
     private fun discoverSpeakerCapability() {
         val candidates = tts.javaClass.methods.filter {
             it.name == "setSpeakerType" && it.parameterTypes.size == 1
@@ -149,9 +159,11 @@ class PleosVoiceDataSourceImpl @Inject constructor(
                 VoiceEvent.SpeakerKind.MANUAL_NUMBER
             else -> VoiceEvent.SpeakerKind.UNSUPPORTED
         }
-        speakerValues = if (type?.isEnum == true) {
-            type.enumConstants.map { (it as Enum<*>).name }
-        } else emptyList()
+        speakerValues = when {
+            type?.isEnum == true -> type.enumConstants.map { (it as Enum<*>).name }
+            speakerKind == VoiceEvent.SpeakerKind.MANUAL_STRING -> documentedSpeakerLocales.keys.toList()
+            else -> emptyList()
+        }
         emit(VoiceEvent.SpeakerSupport(speakerKind, speakerValues, type?.name ?: "호출 불가"))
     }
 
@@ -168,11 +180,19 @@ class PleosVoiceDataSourceImpl @Inject constructor(
         val argument: Any = when (speakerKind) {
             VoiceEvent.SpeakerKind.ENUM_VALUES ->
                 type.enumConstants.firstOrNull { (it as Enum<*>).name == value } ?: return false
-            VoiceEvent.SpeakerKind.MANUAL_STRING -> value.takeIf { it.isNotBlank() } ?: return false
+            VoiceEvent.SpeakerKind.MANUAL_STRING -> value.takeIf { it in documentedSpeakerLocales }
+                ?: run {
+                    emit(VoiceEvent.Failed(VoiceEvent.Engine.TTS, "UNKNOWN_SPEAKER: $value"))
+                    return false
+                }
             VoiceEvent.SpeakerKind.MANUAL_NUMBER -> value.toIntOrNull() ?: return false
             VoiceEvent.SpeakerKind.UNSUPPORTED -> return false
         }
         return runCatching {
+            // 변경한 화자의 언어를 먼저 지정함. 한국어로 고정하면 타 언어 화자 테스트가 부정확함.
+            if (speakerKind == VoiceEvent.SpeakerKind.MANUAL_STRING) {
+                tts.setLocale(documentedSpeakerLocales.getValue(value))
+            }
             val result = method.invoke(tts, argument)
             if (result == false) error("setSpeakerType returned false")
             // 호출 성공은 실제 음색 변화의 보증이 아님. 직접 청취 확인해야 함.

@@ -43,11 +43,14 @@ fun VoiceScreen(
     var rawMain by rememberSaveable { mutableStateOf("") }
     var rawA by rememberSaveable { mutableStateOf("") }
     var rawB by rememberSaveable { mutableStateOf("") }
+    // 기본 음성은 setSpeakerType()을 호출하지 않음.
     val values = state.availableSpeakers
-    val aSpeaker = rawA.ifBlank { values.firstOrNull().orEmpty() }
-    val bSpeaker = rawB.ifBlank { values.getOrNull(1).orEmpty() }
-    val mainSpeaker = rawMain.ifBlank { values.firstOrNull().orEmpty() }
-    val choiceAvailable = state.speakerKind != VoiceEvent.SpeakerKind.UNSUPPORTED
+    val mainSpeaker = rawMain.takeIf { it in values }.orEmpty()
+    val aSpeaker = rawA.takeIf { it in values } ?: values.firstOrNull().orEmpty()
+    val bSpeaker = rawB.takeIf { it in values } ?: values.getOrNull(1).orEmpty()
+    val choiceAvailable = values.isNotEmpty() &&
+        (state.speakerKind == VoiceEvent.SpeakerKind.MANUAL_STRING ||
+            state.speakerKind == VoiceEvent.SpeakerKind.ENUM_VALUES)
     val canPlay = state.ttsStatus == EngineStatus.READY && !state.listening && !state.speaking
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
@@ -58,13 +61,14 @@ fun VoiceScreen(
         Text("TTS: ${state.ttsStatus.label()}" + if (state.speaking) " · 재생 중" else "")
         Text("화자 타입: ${state.speakerParameter}")
         when (state.speakerKind) {
-            VoiceEvent.SpeakerKind.ENUM_VALUES -> Text("SDK에 노출된 화자 타입: ${values.joinToString()}")
-            VoiceEvent.SpeakerKind.MANUAL_STRING -> Text("문자열 화자 타입. 유효한 값 목록이 공개되지 않아 직접 입력해야 함")
-            VoiceEvent.SpeakerKind.MANUAL_NUMBER -> Text("숫자 화자 타입. 유효한 값 목록이 공개되지 않아 직접 입력해야 함")
+            VoiceEvent.SpeakerKind.ENUM_VALUES -> Text("SDK에서 제공하는 화자 목록 사용 중")
+            VoiceEvent.SpeakerKind.MANUAL_STRING -> Text("공식 문서에 안내된 화자 10명 · 언어별 선택 가능")
+            VoiceEvent.SpeakerKind.MANUAL_NUMBER -> Text("현재 SDK의 화자 인자 형식이 문서와 달라 목록 선택을 제공하지 않음")
             VoiceEvent.SpeakerKind.UNSUPPORTED -> Text("이 환경에서 호출 가능한 화자 변경 시그니처를 찾지 못했음")
         }
         if (choiceAvailable) {
-            SpeakerInput("단일 TTS 화자", state, rawMain, { rawMain = it }, mainSpeaker)
+            SpeakerPicker("단일 TTS 화자", state, mainSpeaker, { rawMain = it }, allowDefault = true)
+            Text("기본 음성은 화자 설정을 생략함. 변경 후 원래 음색으로 돌아가려면 앱 재시작이 필요할 수 있음")
             Text("최근 화자 변경 요청: ${state.requestedSpeaker ?: "없음"} (실제 음색은 청취 확인 필요)")
         }
         OutlinedTextField(
@@ -73,7 +77,7 @@ fun VoiceScreen(
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = { onSpeak(text, if (choiceAvailable) mainSpeaker else "") },
-                enabled = canPlay && text.isNotBlank() && (!choiceAvailable || mainSpeaker.isNotBlank())) {
+                enabled = canPlay && text.isNotBlank()) {
                 Text("TTS 재생")
             }
             Button(onClick = onStopSpeaking, enabled = state.speaking || state.previewRunning) { Text("중지") }
@@ -82,8 +86,9 @@ fun VoiceScreen(
         Text("2인 팟캐스트 대화 시연", style = MaterialTheme.typography.titleMedium)
         Text("현재는 준비된 문장 두 개를 순서대로 읽는 테스트임. AI 대본 생성 기능은 포함하지 않음")
         if (choiceAvailable) {
-            SpeakerInput("진행자 A", state, rawA, { rawA = it }, aSpeaker)
-            SpeakerInput("진행자 B", state, rawB, { rawB = it }, bSpeaker)
+            SpeakerPicker("진행자 A", state, aSpeaker, { rawA = it })
+            SpeakerPicker("진행자 B", state, bSpeaker, { rawB = it })
+            Text("선택한 화자 언어에 따라 TTS locale도 변경됨. 각 언어의 문장으로 시험하는 것을 권장함")
         }
         OutlinedTextField(modifier = Modifier.fillMaxWidth(), value = aText,
             onValueChange = { aText = it }, label = { Text("A 대사") })
@@ -119,33 +124,58 @@ fun VoiceScreen(
     }
 }
 
+/** 공식 Pleos Speech Service 3.3.1 문서에 안내된 화자 이름. 대소문자 유지함. */
+private val documentedSpeakers = listOf(
+    "한국어 (ko-KR)" to listOf("seowoon", "eunwoo", "haeun", "sanghyeok"),
+    "영어 (en-US)" to listOf("lyra", "finley"),
+    "스페인어 (es-ES)" to listOf("iris", "arlo"),
+    "프랑스어 (fr-FR)" to listOf("sabine", "noah")
+)
+
 @Composable
-private fun SpeakerInput(
+private fun SpeakerPicker(
     title: String,
     state: VoiceUiState,
     value: String,
     onChange: (String) -> Unit,
-    effectiveValue: String
+    allowDefault: Boolean = false
 ) {
-    if (state.speakerKind == VoiceEvent.SpeakerKind.ENUM_VALUES) {
-        var expanded by rememberSaveable { mutableStateOf(false) }
-        Column {
-            Text(title)
-            Button(onClick = { expanded = true }) { Text(effectiveValue.ifBlank { "화자 선택" }) }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                state.availableSpeakers.forEach { item ->
-                    DropdownMenuItem(text = { Text(item) }, onClick = {
-                        onChange(item)
-                        expanded = false
-                    })
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val groups = if (state.speakerKind == VoiceEvent.SpeakerKind.MANUAL_STRING) {
+        documentedSpeakers.map { (language, names) ->
+            language to names.filter { it in state.availableSpeakers }
+        }.filter { it.second.isNotEmpty() }
+    } else {
+        listOf("SDK 제공 화자" to state.availableSpeakers)
+    }
+
+    Column {
+        Text(title, style = MaterialTheme.typography.labelLarge)
+        Button(onClick = { expanded = true }) {
+            Text(value.ifBlank { if (allowDefault) "기본 음성 (설정 생략)" else "화자 선택" })
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            if (allowDefault) {
+                DropdownMenuItem(
+                    text = { Text("기본 음성 (화자 미지정)") },
+                    onClick = { onChange(""); expanded = false }
+                )
+                HorizontalDivider()
+            }
+            groups.forEach { (language, names) ->
+                Text(
+                    language,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp)
+                )
+                names.forEach { name ->
+                    DropdownMenuItem(
+                        text = { Text(name) },
+                        onClick = { onChange(name); expanded = false }
+                    )
                 }
             }
         }
-    } else {
-        OutlinedTextField(
-            modifier = Modifier.fillMaxWidth(), value = value,
-            onValueChange = onChange, label = { Text("$title (SDK raw type 값)") }
-        )
     }
 }
 
