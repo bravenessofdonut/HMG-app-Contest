@@ -13,7 +13,13 @@ sealed interface VoiceEvent {
     data class SttEndpoint(val speechStart: Long, val speechEnd: Long) : VoiceEvent
     data class Transcription(val text: String, val completed: Boolean) : VoiceEvent
     data object ListeningStopped : VoiceEvent
-    data class SpeakerSupport(val kind: SpeakerKind, val values: List<String>, val parameter: String) : VoiceEvent
+    /** SDK 어댑터가 제공하는 유효 화자 및 언어 태그. UI에는 SDK 구현 타입을 노출하지 않음. */
+    data class SpeakerSupport(
+        val kind: SpeakerKind,
+        val values: List<String>,
+        val parameter: String,
+        val languageTags: Map<String, String> = emptyMap()
+    ) : VoiceEvent
     data class SpeakerRequestSent(val value: String) : VoiceEvent
     data class Failed(val engine: Engine, val reason: String) : VoiceEvent
 

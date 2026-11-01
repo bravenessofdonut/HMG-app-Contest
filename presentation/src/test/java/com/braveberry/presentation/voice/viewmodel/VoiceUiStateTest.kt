@@ -25,7 +25,8 @@ class VoiceUiStateTest {
         val failed = ready.applyEvent(VoiceEvent.Failed(VoiceEvent.Engine.TTS, "SERVICE_ERROR"))
         assertEquals(EngineStatus.READY, failed.sttStatus)
         assertEquals(EngineStatus.ERROR, failed.ttsStatus)
-        assertEquals("TTS: SERVICE_ERROR", failed.error)
+        assertEquals("TTS: SERVICE_ERROR", failed.ttsError)
+        assertEquals(null, failed.sttError)
     }
 
     @Test fun speakerChoicesAreActualSdkValues() {

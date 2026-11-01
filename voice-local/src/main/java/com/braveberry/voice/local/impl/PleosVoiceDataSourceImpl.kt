@@ -13,6 +13,7 @@ import ai.pleos.playground.tts.listener.EventListener
 import ai.pleos.playground.tts.listener.OnInitializeListener as TtsInitializeListener
 import com.braveberry.domain.model.voice.VoiceEvent
 import com.braveberry.voice.data.datasource.VoiceDataSource
+import com.braveberry.voice.local.model.PleosSpeakerCatalog
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.Locale
 import java.lang.reflect.Method
@@ -20,20 +21,6 @@ import android.os.SystemClock
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
-
-/** 문서상 SDK 문자열 화자 목록. 앱에 없는 값은 SDK로 전달하지 않음. */
-private val documentedSpeakerLocales: Map<String, Locale> = linkedMapOf(
-    "seoyoon" to Locale.KOREA,
-    "eunwoo" to Locale.KOREA,
-    "haeun" to Locale.KOREA,
-    "sanghyeok" to Locale.KOREA,
-    "lyra" to Locale.US,
-    "finley" to Locale.US,
-    "iris" to Locale("es", "ES"),
-    "arlo" to Locale("es", "ES"),
-    "sabine" to Locale.FRANCE,
-    "noah" to Locale.FRANCE
-)
 
 /** Pleos Connect Speech Service와 직접 통신하는 유일한 경계. */
 class PleosVoiceDataSourceImpl @Inject constructor(
@@ -161,10 +148,16 @@ class PleosVoiceDataSourceImpl @Inject constructor(
         }
         speakerValues = when {
             type?.isEnum == true -> type.enumConstants.map { (it as Enum<*>).name }
-            speakerKind == VoiceEvent.SpeakerKind.MANUAL_STRING -> documentedSpeakerLocales.keys.toList()
+            speakerKind == VoiceEvent.SpeakerKind.MANUAL_STRING -> PleosSpeakerCatalog.locales.keys.toList()
             else -> emptyList()
         }
-        emit(VoiceEvent.SpeakerSupport(speakerKind, speakerValues, type?.name ?: "호출 불가"))
+        emit(VoiceEvent.SpeakerSupport(
+            kind = speakerKind,
+            values = speakerValues,
+            parameter = type?.name ?: "호출 불가",
+            languageTags = if (speakerKind == VoiceEvent.SpeakerKind.MANUAL_STRING)
+                PleosSpeakerCatalog.languageTags else emptyMap()
+        ))
     }
 
     override fun selectSpeaker(value: String): Boolean {
@@ -180,7 +173,7 @@ class PleosVoiceDataSourceImpl @Inject constructor(
         val argument: Any = when (speakerKind) {
             VoiceEvent.SpeakerKind.ENUM_VALUES ->
                 type.enumConstants.firstOrNull { (it as Enum<*>).name == value } ?: return false
-            VoiceEvent.SpeakerKind.MANUAL_STRING -> value.takeIf { it in documentedSpeakerLocales }
+            VoiceEvent.SpeakerKind.MANUAL_STRING -> value.takeIf { it in PleosSpeakerCatalog.locales }
                 ?: run {
                     emit(VoiceEvent.Failed(VoiceEvent.Engine.TTS, "UNKNOWN_SPEAKER: $value"))
                     return false
@@ -191,7 +184,7 @@ class PleosVoiceDataSourceImpl @Inject constructor(
         return runCatching {
             // 변경한 화자의 언어를 먼저 지정함. 한국어로 고정하면 타 언어 화자 테스트가 부정확함.
             if (speakerKind == VoiceEvent.SpeakerKind.MANUAL_STRING) {
-                tts.setLocale(documentedSpeakerLocales.getValue(value))
+                tts.setLocale(PleosSpeakerCatalog.locales.getValue(value))
             }
             val result = method.invoke(tts, argument)
             if (result == false) error("setSpeakerType returned false")

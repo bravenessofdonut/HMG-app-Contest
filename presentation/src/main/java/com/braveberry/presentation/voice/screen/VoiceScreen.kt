@@ -26,6 +26,7 @@ import com.braveberry.domain.model.voice.VoiceEvent
 import com.braveberry.presentation.voice.viewmodel.EngineStatus
 import com.braveberry.presentation.voice.viewmodel.ListeningPhase
 import com.braveberry.presentation.voice.viewmodel.VoiceUiState
+import java.util.Locale
 
 @Composable
 fun VoiceScreen(
@@ -118,19 +119,12 @@ fun VoiceScreen(
         }
         Text("인식 결과: ${state.transcript.ifBlank { "아직 없음" }}")
         Text(if (state.transcriptCompleted) "최종 결과" else "중간 결과 또는 대기 중")
-        state.error?.let { Text("오류: $it", color = MaterialTheme.colorScheme.error) }
+        state.ttsError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        state.sttError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         Text("실제 STT 테스트는 Pleos 에뮬레이터 마이크 접근을 설정해야 함")
         Button(onClick = onBack) { Text("차량 화면으로") }
     }
 }
-
-/** 공식 Pleos Speech Service 3.3.1 문서에 안내된 화자 이름. 대소문자 유지함. */
-private val documentedSpeakers = listOf(
-    "한국어 (ko-KR)" to listOf("seowoon", "eunwoo", "haeun", "sanghyeok"),
-    "영어 (en-US)" to listOf("lyra", "finley"),
-    "스페인어 (es-ES)" to listOf("iris", "arlo"),
-    "프랑스어 (fr-FR)" to listOf("sabine", "noah")
-)
 
 @Composable
 private fun SpeakerPicker(
@@ -141,10 +135,14 @@ private fun SpeakerPicker(
     allowDefault: Boolean = false
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
+    // 화자 이름·언어 정보는 SDK 어댑터가 제공함. UI에는 중복 목록을 두지 않음.
     val groups = if (state.speakerKind == VoiceEvent.SpeakerKind.MANUAL_STRING) {
-        documentedSpeakers.map { (language, names) ->
-            language to names.filter { it in state.availableSpeakers }
-        }.filter { it.second.isNotEmpty() }
+        state.availableSpeakers.groupBy { state.speakerLanguageTags[it] }.map { (tag, names) ->
+            val label = if (tag.isNullOrBlank()) "기타" else {
+                "${Locale.forLanguageTag(tag).getDisplayLanguage(Locale.KOREAN)} ($tag)"
+            }
+            label to names
+        }
     } else {
         listOf("SDK 제공 화자" to state.availableSpeakers)
     }
