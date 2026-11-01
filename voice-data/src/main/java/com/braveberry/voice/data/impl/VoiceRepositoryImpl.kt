@@ -10,6 +10,7 @@ class VoiceRepositoryImpl @Inject constructor(
     override val events get() = source.events
     override fun initialize() = source.initialize()
     override fun speak(text: String) = source.speak(text)
+    override fun selectSpeaker(value: String) = source.selectSpeaker(value)
     override fun stopSpeaking() = source.stopSpeaking()
     override fun startListening() = source.startListening()
     override fun stopListening() = source.stopListening()

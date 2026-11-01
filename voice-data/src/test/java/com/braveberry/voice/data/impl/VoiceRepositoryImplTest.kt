@@ -15,11 +15,12 @@ class VoiceRepositoryImplTest {
         val repository = VoiceRepositoryImpl(fake)
         repository.initialize()
         repository.speak("테스트")
+        assertEquals(true, repository.selectSpeaker("VOICE_A"))
         repository.startListening()
         repository.stopListening()
         repository.stopSpeaking()
         repository.release()
-        assertEquals(listOf("initialize", "speak:테스트", "listen", "stopListen", "stopSpeak", "release"), fake.calls)
+        assertEquals(listOf("initialize", "speak:테스트", "speaker:VOICE_A", "listen", "stopListen", "stopSpeak", "release"), fake.calls)
         assertEquals(VoiceEvent.SttReady, repository.events.first())
     }
 
@@ -28,6 +29,7 @@ class VoiceRepositoryImplTest {
         override val events: Flow<VoiceEvent> = flowOf(VoiceEvent.SttReady)
         override fun initialize() { calls += "initialize" }
         override fun speak(text: String) { calls += "speak:$text" }
+        override fun selectSpeaker(value: String): Boolean { calls += "speaker:$value"; return true }
         override fun stopSpeaking() { calls += "stopSpeak" }
         override fun startListening() { calls += "listen" }
         override fun stopListening() { calls += "stopListen" }

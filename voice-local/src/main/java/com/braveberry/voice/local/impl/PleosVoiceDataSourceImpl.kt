@@ -15,6 +15,8 @@ import com.braveberry.domain.model.voice.VoiceEvent
 import com.braveberry.voice.data.datasource.VoiceDataSource
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.Locale
+import java.lang.reflect.Method
+import android.os.SystemClock
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -34,6 +36,10 @@ class PleosVoiceDataSourceImpl @Inject constructor(
     private var initialized = false
     private var ttsListenerRegistered = false
     private var sttListenerRegistered = false
+    private var speakerSetter: Method? = null
+    private var speakerKind = VoiceEvent.SpeakerKind.UNSUPPORTED
+    private var speakerValues: List<String> = emptyList()
+    private var lastRmsTime = 0L
 
     private fun emit(event: VoiceEvent) {
         if (!released) eventBus.tryEmit(event)
@@ -50,12 +56,20 @@ class PleosVoiceDataSourceImpl @Inject constructor(
     }
 
     private val sttListener = object : ResultListener {
-        override fun onReady() = Unit
+        override fun onReady() = emit(VoiceEvent.SttInputReady)
         override fun onStartedRecognition() = emit(VoiceEvent.Listening)
         override fun onUpdated(stt: String, completed: Boolean) =
             emit(VoiceEvent.Transcription(stt, completed))
-        override fun onUpdatedEpdData(on: Long, off: Long) = Unit
-        override fun onUpdatedRms(rms: Double) = Unit
+        override fun onUpdatedEpdData(on: Long, off: Long) =
+            emit(VoiceEvent.SttEndpoint(on, off))
+        override fun onUpdatedRms(rms: Double) {
+            val now = SystemClock.elapsedRealtime()
+            // UI 갱신 빈도를 제한함. 값은 SDK 원본 단위 그대로 표시함.
+            if (now - lastRmsTime >= 250L) {
+                lastRmsTime = now
+                emit(VoiceEvent.SttRms(rms))
+            }
+        }
         override fun onEndedRecognition() = emit(VoiceEvent.ListeningStopped)
         override fun onError(errorType: SttErrorType) =
             emit(VoiceEvent.Failed(VoiceEvent.Engine.STT, errorType.name))
@@ -74,6 +88,7 @@ class PleosVoiceDataSourceImpl @Inject constructor(
                         tts.setLocale(Locale.KOREA)
                         ttsReady = true
                         emit(VoiceEvent.TtsReady)
+                        discoverSpeakerCapability()
                     }.onFailure { fail(VoiceEvent.Engine.TTS, it) }
                 }
 
@@ -108,6 +123,61 @@ class PleosVoiceDataSourceImpl @Inject constructor(
             return
         }
         runCatching { tts.speak(text) }.onFailure { fail(VoiceEvent.Engine.TTS, it) }
+    }
+
+    /**
+     * SDK 3.3.1에 setSpeakerType은 존재하지만 공개 문서에 인자와 음성 목록이 없음.
+     * 앱 실행 시 SDK의 공개 시그니처를 확인하고, enum일 때만 목록을 자동 제공함.
+     * 타입을 추측해 임의의 남/여 음성 번호를 주입하지 않음.
+     */
+    private fun discoverSpeakerCapability() {
+        val candidates = tts.javaClass.methods.filter {
+            it.name == "setSpeakerType" && it.parameterTypes.size == 1
+        }
+        fun rank(method: Method): Int = when (val type = method.parameterTypes[0]) {
+            String::class.java -> 1
+            Int::class.javaPrimitiveType, Int::class.javaObjectType -> 2
+            else -> if (type.isEnum) 0 else 10
+        }
+        val method = candidates.minByOrNull(::rank)
+        speakerSetter = method
+        val type = method?.parameterTypes?.singleOrNull()
+        speakerKind = when {
+            type?.isEnum == true -> VoiceEvent.SpeakerKind.ENUM_VALUES
+            type == String::class.java -> VoiceEvent.SpeakerKind.MANUAL_STRING
+            type == Int::class.javaPrimitiveType || type == Int::class.javaObjectType ->
+                VoiceEvent.SpeakerKind.MANUAL_NUMBER
+            else -> VoiceEvent.SpeakerKind.UNSUPPORTED
+        }
+        speakerValues = if (type?.isEnum == true) {
+            type.enumConstants.map { (it as Enum<*>).name }
+        } else emptyList()
+        emit(VoiceEvent.SpeakerSupport(speakerKind, speakerValues, type?.name ?: "호출 불가"))
+    }
+
+    override fun selectSpeaker(value: String): Boolean {
+        if (!ttsReady) {
+            emit(VoiceEvent.Failed(VoiceEvent.Engine.TTS, "TTS_NOT_READY"))
+            return false
+        }
+        val method = speakerSetter ?: run {
+            emit(VoiceEvent.Failed(VoiceEvent.Engine.TTS, "SPEAKER_TYPE_UNSUPPORTED"))
+            return false
+        }
+        val type = method.parameterTypes.single()
+        val argument: Any = when (speakerKind) {
+            VoiceEvent.SpeakerKind.ENUM_VALUES ->
+                type.enumConstants.firstOrNull { (it as Enum<*>).name == value } ?: return false
+            VoiceEvent.SpeakerKind.MANUAL_STRING -> value.takeIf { it.isNotBlank() } ?: return false
+            VoiceEvent.SpeakerKind.MANUAL_NUMBER -> value.toIntOrNull() ?: return false
+            VoiceEvent.SpeakerKind.UNSUPPORTED -> return false
+        }
+        return runCatching {
+            val result = method.invoke(tts, argument)
+            if (result == false) error("setSpeakerType returned false")
+            // 호출 성공은 실제 음색 변화의 보증이 아님. 직접 청취 확인해야 함.
+            emit(VoiceEvent.SpeakerRequestSent(value))
+        }.onFailure { fail(VoiceEvent.Engine.TTS, it.cause ?: it) }.isSuccess
     }
 
     override fun stopSpeaking() {

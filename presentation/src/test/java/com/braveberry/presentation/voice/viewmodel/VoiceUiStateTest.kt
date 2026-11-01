@@ -27,4 +27,27 @@ class VoiceUiStateTest {
         assertEquals(EngineStatus.ERROR, failed.ttsStatus)
         assertEquals("TTS: SERVICE_ERROR", failed.error)
     }
+
+    @Test fun speakerChoicesAreActualSdkValues() {
+        val options = listOf("ONE", "TWO")
+        val state = VoiceUiState().applyEvent(
+            VoiceEvent.SpeakerSupport(VoiceEvent.SpeakerKind.ENUM_VALUES, options, "SpeakerType")
+        )
+        assertEquals(options, state.availableSpeakers)
+        assertEquals(VoiceEvent.SpeakerKind.ENUM_VALUES, state.speakerKind)
+        assertEquals("TWO", state.applyEvent(VoiceEvent.SpeakerRequestSent("TWO")).requestedSpeaker)
+    }
+
+    @Test fun sttDiagnosticsKeepFinalTranscriptAfterRecognitionEnds() {
+        val listening = VoiceUiState().applyEvent(VoiceEvent.SttReady)
+            .applyEvent(VoiceEvent.SttInputReady)
+            .applyEvent(VoiceEvent.Listening)
+            .applyEvent(VoiceEvent.SttRms(12.0))
+            .applyEvent(VoiceEvent.Transcription("좋은 아침", true))
+        val ended = listening.applyEvent(VoiceEvent.ListeningStopped)
+        assertEquals("좋은 아침", ended.transcript)
+        assertTrue(ended.transcriptCompleted)
+        assertEquals(12.0, ended.sttRms!!, 0.0001)
+        assertEquals(ListeningPhase.ENDED, ended.listeningPhase)
+    }
 }
