@@ -14,6 +14,7 @@ fun VehicleRoute(
     speedPermissionGranted: Boolean,
     onRequestSpeedPermission: () -> Unit,
     onShowAbout: () -> Unit,
+    onShowVoice: () -> Unit,
     viewModel: VehicleViewModel = hiltViewModel()
 ) {
     val state by viewModel.container.stateFlow.collectAsStateWithLifecycle()
@@ -28,6 +29,7 @@ fun VehicleRoute(
             onRetrySpeed = viewModel::retrySpeed,
             onRetryDoor = viewModel::retryDoor,
             onShowAbout = onShowAbout,
+            onShowVoice = onShowVoice,
             padding = innerPadding
         )
     }

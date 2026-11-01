@@ -12,10 +12,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.braveberry.presentation.vehicle.screen.VehicleRoute
+import com.braveberry.presentation.voice.screen.VoiceRoute
 
 private object Routes {
     const val DASHBOARD = "vehicle/dashboard"
     const val ABOUT = "vehicle/about"
+    const val VOICE = "voice/demo"
 }
 
 @Composable
@@ -29,8 +31,12 @@ fun DrivingNavHost(
             VehicleRoute(
                 speedPermissionGranted = speedPermissionGranted,
                 onRequestSpeedPermission = onRequestSpeedPermission,
-                onShowAbout = { navController.navigate(Routes.ABOUT) }
+                onShowAbout = { navController.navigate(Routes.ABOUT) },
+                onShowVoice = { navController.navigate(Routes.VOICE) }
             )
+        }
+        composable(Routes.VOICE) {
+            VoiceRoute(onBack = { navController.popBackStack() })
         }
         composable(Routes.ABOUT) {
             Column(Modifier.fillMaxSize().padding(24.dp)) {

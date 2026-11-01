@@ -25,6 +25,7 @@ fun VehicleScreen(
     onRetrySpeed: () -> Unit,
     onRetryDoor: () -> Unit,
     onShowAbout: () -> Unit,
+    onShowVoice: () -> Unit,
     padding: PaddingValues = PaddingValues(0.dp)
 ) {
     Column(
@@ -54,6 +55,7 @@ fun VehicleScreen(
             is Reading.Failed -> "수신 실패: ${r.explanation}"
         })
         Button(onClick = onRetryDoor) { Text("도어 재연결") }
+        Button(onClick = onShowVoice) { Text("Pleos TTS/STT 테스트") }
         Button(onClick = onShowAbout) { Text("데이터 출처 및 설명") }
     }
 }

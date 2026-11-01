@@ -6,6 +6,9 @@
     <uses-permission android:name="android.car.permission.CAR_SPEED" />
     <!-- Pleos Vehicle SDK: Door Position 읽기/구독 용도로만 사용 -->
     <uses-permission android:name="pleos.car.permission.CAR_DOORS" />
+    <!-- Pleos Speech Service: 차량 TTS/STT 접근 -->
+    <uses-permission android:name="pleos.car.permission.TTS_SERVICE" />
+    <uses-permission android:name="pleos.car.permission.STT_SERVICE" />
     <uses-feature android:name="android.hardware.type.automotive" android:required="false" />
 
     <application
@@ -26,7 +29,6 @@
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
             <meta-data

@@ -28,6 +28,8 @@ dependencies {
     // Composition root: 구현 모듈을 최종 APK/Hilt classpath에 포함함.
     implementation(project(":vehicle-data"))
     implementation(project(":vehicle-local"))
+    implementation(project(":voice-data"))
+    implementation(project(":voice-local"))
     implementation(libs.androidx.hilt.navigation.compose)
     androidTestImplementation("com.google.dagger:hilt-android-testing:${libs.versions.hilt.get()}")
     kspAndroidTest(libs.hilt.compiler)
