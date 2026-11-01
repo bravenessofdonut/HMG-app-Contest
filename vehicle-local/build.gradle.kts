@@ -3,7 +3,10 @@ plugins {
     id("braveberry.android.hilt")
 }
 
-android { namespace = "com.braveberry.vehicle.local" }
+android {
+    namespace = "com.braveberry.vehicle.local"
+    useLibrary("android.car", false)
+}
 
 dependencies {
     implementation(project(":vehicle-data"))

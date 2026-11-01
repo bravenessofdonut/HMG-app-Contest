@@ -22,7 +22,7 @@ class VehicleRepositoryImpl @Inject constructor(
 
 private fun classifyVehicleFailure(cause: Exception): ResourceFailure? = when (cause) {
     is SecurityException -> ResourceFailure.PermissionRequired(cause)
-    is ReflectiveOperationException -> ResourceFailure.Unsupported(cause)
+    is UnsupportedOperationException -> ResourceFailure.Unsupported(cause)
     is IOException -> ResourceFailure.ServiceUnavailable(cause)
     else -> null
 }

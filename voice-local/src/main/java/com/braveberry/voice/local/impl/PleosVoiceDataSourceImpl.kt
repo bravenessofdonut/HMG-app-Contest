@@ -19,7 +19,6 @@ import com.braveberry.voice.data.datasource.VoiceDataSource
 import com.braveberry.voice.local.model.PleosSpeakerCatalog
 import com.braveberry.voice.local.source.VoiceEventInbox
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.lang.reflect.Method
 import java.util.Locale
 import javax.inject.Inject
 
@@ -39,9 +38,6 @@ class PleosVoiceDataSourceImpl @Inject constructor(
     private var initialized = false
     private var ttsListenerRegistered = false
     private var sttListenerRegistered = false
-    private var speakerSetter: Method? = null
-    private var speakerKind = VoiceEvent.SpeakerKind.UNSUPPORTED
-    private var speakerValues: List<String> = emptyList()
     private var lastRmsTime = 0L
 
     private fun emit(event: VoiceEvent) {
@@ -92,7 +88,7 @@ class PleosVoiceDataSourceImpl @Inject constructor(
                             tts.setLocale(Locale.KOREA)
                             ttsReady = true
                             emit(VoiceEvent.TtsReady)
-                            discoverSpeakerCapability()
+                            publishSpeakers()
                         }.onFailure { fail(VoiceEvent.Engine.TTS, it) }
                     }
                 }
@@ -132,37 +128,12 @@ class PleosVoiceDataSourceImpl @Inject constructor(
         runCatching { tts.speak(text) }.onFailure { fail(VoiceEvent.Engine.TTS, it) }
     }
 
-    /** SDK 3.3.1의 공개 시그니처를 확인하고 문서상 문자열 화자 또는 enum 값만 노출함. */
-    private fun discoverSpeakerCapability() {
-        val candidates = tts.javaClass.methods.filter {
-            it.name == "setSpeakerType" && it.parameterTypes.size == 1
-        }
-        fun rank(method: Method): Int = when (val type = method.parameterTypes[0]) {
-            String::class.java -> 1
-            Int::class.javaPrimitiveType, Int::class.javaObjectType -> 2
-            else -> if (type.isEnum) 0 else 10
-        }
-        val method = candidates.minByOrNull(::rank)
-        speakerSetter = method
-        val type = method?.parameterTypes?.singleOrNull()
-        speakerKind = when {
-            type?.isEnum == true -> VoiceEvent.SpeakerKind.ENUM_VALUES
-            type == String::class.java -> VoiceEvent.SpeakerKind.MANUAL_STRING
-            type == Int::class.javaPrimitiveType || type == Int::class.javaObjectType ->
-                VoiceEvent.SpeakerKind.MANUAL_NUMBER
-            else -> VoiceEvent.SpeakerKind.UNSUPPORTED
-        }
-        speakerValues = when {
-            type?.isEnum == true -> type.enumConstants.map { (it as Enum<*>).name }
-            speakerKind == VoiceEvent.SpeakerKind.MANUAL_STRING -> PleosSpeakerCatalog.locales.keys.toList()
-            else -> emptyList()
-        }
+    private fun publishSpeakers() {
         emit(VoiceEvent.SpeakerSupport(
-            kind = speakerKind,
-            values = speakerValues,
-            parameter = type?.name ?: "호출 불가",
-            languageTags = if (speakerKind == VoiceEvent.SpeakerKind.MANUAL_STRING)
-                PleosSpeakerCatalog.languageTags else emptyMap()
+            kind = VoiceEvent.SpeakerKind.MANUAL_STRING,
+            values = PleosSpeakerCatalog.locales.keys.toList(),
+            parameter = "String",
+            languageTags = PleosSpeakerCatalog.languageTags
         ))
     }
 
@@ -171,32 +142,15 @@ class PleosVoiceDataSourceImpl @Inject constructor(
             emit(VoiceEvent.Failed(VoiceEvent.Engine.TTS, "TTS_NOT_READY"))
             return false
         }
-        val method = speakerSetter ?: run {
-            emit(VoiceEvent.Failed(VoiceEvent.Engine.TTS, "SPEAKER_TYPE_UNSUPPORTED"))
+        val locale = PleosSpeakerCatalog.locales[value] ?: run {
+            emit(VoiceEvent.Failed(VoiceEvent.Engine.TTS, "UNKNOWN_SPEAKER: $value"))
             return false
         }
-        val type = method.parameterTypes.single()
-        val argument: Any = when (speakerKind) {
-            VoiceEvent.SpeakerKind.ENUM_VALUES ->
-                type.enumConstants.firstOrNull { (it as Enum<*>).name == value } ?: return false
-            VoiceEvent.SpeakerKind.MANUAL_STRING -> value.takeIf { it in PleosSpeakerCatalog.locales }
-                ?: run {
-                    emit(VoiceEvent.Failed(VoiceEvent.Engine.TTS, "UNKNOWN_SPEAKER: $value"))
-                    return false
-                }
-            VoiceEvent.SpeakerKind.MANUAL_NUMBER -> value.toIntOrNull() ?: return false
-            VoiceEvent.SpeakerKind.UNSUPPORTED -> return false
-        }
         return runCatching {
-            // 변경한 화자의 언어를 먼저 지정함. 한국어로 고정하면 타 언어 화자 테스트가 부정확함.
-            if (speakerKind == VoiceEvent.SpeakerKind.MANUAL_STRING) {
-                tts.setLocale(PleosSpeakerCatalog.locales.getValue(value))
-            }
-            val result = method.invoke(tts, argument)
-            if (result == false) error("setSpeakerType returned false")
-            // 호출 성공은 실제 음색 변화의 보증이 아님. 직접 청취 확인해야 함.
+            tts.setLocale(locale)
+            tts.setSpeakerType(value)
             emit(VoiceEvent.SpeakerRequestSent(value))
-        }.onFailure { fail(VoiceEvent.Engine.TTS, it.cause ?: it) }.isSuccess
+        }.onFailure { fail(VoiceEvent.Engine.TTS, it) }.isSuccess
     }
 
     override fun stopSpeaking() {
