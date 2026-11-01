@@ -4,5 +4,5 @@ plugins {
 }
 
 dependencies{
-    implementation(project(":data-resource"))
+    api(project(":data-resource"))
 }

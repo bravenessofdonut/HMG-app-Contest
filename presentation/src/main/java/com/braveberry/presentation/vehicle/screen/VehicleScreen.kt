@@ -1,5 +1,6 @@
 package com.braveberry.presentation.vehicle.screen
 
+import com.braveberry.domain.model.vehicle.DoorPosition
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -34,23 +35,22 @@ fun VehicleScreen(
     ) {
         Text("차량 상태", style = MaterialTheme.typography.headlineMedium)
         Text("실시간 신호 / 미수신 값을 임의 숫자로 대체하지 않음")
-        ReadingCard("차량 속도 (AAOS)", when (val r = state.speedMetersPerSecond) {
+        ReadingCard("차량 속도 (AAOS)", if (!speedPermissionGranted) "차량 속도 권한 필요" else when (val r = state.speedMetersPerSecond) {
             is Reading.Loading -> "속도 데이터 대기 중"
             is Reading.Ready -> String.format(Locale.KOREA, "%.1f km/h", r.data * 3.6f)
             is Reading.Failed -> "수신 실패: ${r.explanation}"
         })
         if (!speedPermissionGranted) {
             Button(onClick = onRequestSpeedPermission) { Text("차량 속도 권한 요청") }
+        } else {
+            Button(onClick = onRetrySpeed) { Text("속도 재연결") }
         }
-        Button(onClick = onRetrySpeed) { Text("속도 재연결") }
 
         ReadingCard("운전석 도어 (Pleos SDK)", when (val r = state.driverDoorPosition) {
             is Reading.Loading -> "도어 데이터 대기 중"
-            is Reading.Ready -> when (r.data) {
-                null -> "현재값 미수신"
-                0 -> "닫힘 (0)"
-                1 -> "열림 (1)"
-                else -> "상태 코드: ${r.data}"
+            is Reading.Ready -> when (val position = r.data) {
+                DoorPosition.Unavailable -> "현재값 미수신"
+                is DoorPosition.Unrecognized -> "미확인 도어 코드: ${position.rawCode}"
             }
             is Reading.Failed -> "수신 실패: ${r.explanation}"
         })

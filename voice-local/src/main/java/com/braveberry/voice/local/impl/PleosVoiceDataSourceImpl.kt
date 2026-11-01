@@ -23,7 +23,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 
 /** 문서상 SDK 문자열 화자 목록. 앱에 없는 값은 SDK로 전달하지 않음. */
 private val documentedSpeakerLocales: Map<String, Locale> = linkedMapOf(
-    "seowoon" to Locale.KOREA,
+    "seoyoon" to Locale.KOREA,
     "eunwoo" to Locale.KOREA,
     "haeun" to Locale.KOREA,
     "sanghyeok" to Locale.KOREA,

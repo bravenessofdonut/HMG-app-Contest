@@ -19,7 +19,7 @@ fun VehicleRoute(
 ) {
     val state by viewModel.container.stateFlow.collectAsStateWithLifecycle()
     LaunchedEffect(speedPermissionGranted) {
-        if (speedPermissionGranted) viewModel.retrySpeed()
+        viewModel.onSpeedPermissionChanged(speedPermissionGranted)
     }
     Scaffold { innerPadding ->
         VehicleScreen(

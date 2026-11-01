@@ -1,5 +1,6 @@
 package com.braveberry.presentation.vehicle.viewmodel
 
+import com.braveberry.domain.model.vehicle.DoorPosition
 sealed interface Reading<out T> {
     data object Loading : Reading<Nothing>
     data class Ready<T>(val data: T) : Reading<T>
@@ -8,5 +9,5 @@ sealed interface Reading<out T> {
 
 data class VehicleUiState(
     val speedMetersPerSecond: Reading<Float> = Reading.Loading,
-    val driverDoorPosition: Reading<Int?> = Reading.Loading
+    val driverDoorPosition: Reading<DoorPosition> = Reading.Loading
 )

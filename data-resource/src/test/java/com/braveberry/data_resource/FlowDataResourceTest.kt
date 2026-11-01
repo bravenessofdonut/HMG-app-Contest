@@ -10,6 +10,36 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FlowDataResourceTest {
+    @Test fun onlySuccessStartsTheNextOperation() = runTest {
+        val cause = IllegalStateException("offline")
+        val calls = mutableListOf<Int>()
+        val results = flowOf<DataResource<Int>>(
+            DataResource.loading(), DataResource.loading(1), DataResource.success(2), DataResource.error(cause)
+        ).flatMapDataResource { value ->
+            calls += value
+            flowOf(DataResource.success(value.toString()))
+        }.toList()
+
+        assertEquals(listOf(2), calls)
+        assertEquals(4, results.size)
+        assertTrue(results[0] is DataResource.Loading && results[1] is DataResource.Loading)
+        assertEquals("2", (results[2] as DataResource.Success).data)
+        assertEquals(cause, (results[3] as DataResource.Error).throwable)
+    }
+
+    @Test fun collectingDoesNotReportCancellationAsFailure() = runTest {
+        val cancel = CancellationException("stop")
+        try {
+            flow<DataResource<Int>> { throw cancel }.collectDataResource(
+                onSuccess = { throw AssertionError("Unexpected value") },
+                onError = { throw AssertionError("Unexpected failure", it) }
+            )
+            throw AssertionError("Expected cancellation")
+        } catch (expected: CancellationException) {
+            assertEquals(cancel, expected)
+        }
+    }
+
     @Test fun wrapsSuccessWithLoading() = runTest {
         val events = flowOf(2, 3).asDataResourceFlow().toList()
         assertTrue(events.first() is DataResource.Loading)

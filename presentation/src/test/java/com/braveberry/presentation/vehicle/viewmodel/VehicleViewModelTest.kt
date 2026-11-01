@@ -1,5 +1,6 @@
 package com.braveberry.presentation.vehicle.viewmodel
 
+import com.braveberry.domain.model.vehicle.DoorPosition
 import com.braveberry.data_resource.DataResource
 import com.braveberry.domain.repository.VehicleRepository
 import com.braveberry.domain.usecase.vehicle.ObserveDriverDoorUseCase
@@ -22,12 +23,28 @@ import org.junit.Test
 class VehicleViewModelTest {
     @After fun tearDown() = Dispatchers.resetMain()
 
+    @Test fun speedSubscriptionFollowsPermissionTransitions() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        val repository = FakeRepository()
+        val vm = VehicleViewModel(ObserveSpeedUseCase(repository), ObserveDriverDoorUseCase(repository))
+        vm.retrySpeed()
+        assertEquals(0, repository.speedRequests)
+        vm.onSpeedPermissionChanged(true)
+        vm.onSpeedPermissionChanged(true)
+        assertEquals(1, repository.speedRequests)
+        vm.onSpeedPermissionChanged(false)
+        assertEquals(0, repository.speed.subscriptionCount.value)
+        vm.onSpeedPermissionChanged(true)
+        assertEquals(2, repository.speedRequests)
+    }
+
     @Test fun speedAndDoorHaveIndependentOrbitStates() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         val repository = FakeRepository()
         repository.speed.tryEmit(DataResource.success(15f))
         repository.door.tryEmit(DataResource.error(IllegalStateException("door offline")))
         val vm = VehicleViewModel(ObserveSpeedUseCase(repository), ObserveDriverDoorUseCase(repository))
+        vm.onSpeedPermissionChanged(true)
         val expected = VehicleUiState(
             speedMetersPerSecond = Reading.Ready(15f),
             driverDoorPosition = Reading.Failed("door offline")
@@ -40,12 +57,13 @@ class VehicleViewModelTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         val repository = FakeRepository()
         repository.speed.tryEmit(DataResource.success(5f))
-        repository.door.tryEmit(DataResource.success(1))
+        repository.door.tryEmit(DataResource.success(DoorPosition.Unrecognized(1)))
         val vm = VehicleViewModel(ObserveSpeedUseCase(repository), ObserveDriverDoorUseCase(repository))
+        vm.onSpeedPermissionChanged(true)
         // 최초 속도와 도어 값이 모두 반영된 이후에 재시도함.
         val beforeRetry = VehicleUiState(
             speedMetersPerSecond = Reading.Ready(5f),
-            driverDoorPosition = Reading.Ready(1)
+            driverDoorPosition = Reading.Ready(DoorPosition.Unrecognized(1))
         )
         assertEquals(beforeRetry, vm.awaitState(beforeRetry))
 
@@ -63,8 +81,14 @@ class VehicleViewModelTest {
 
     private class FakeRepository : VehicleRepository {
         val speed = MutableSharedFlow<DataResource<Float>>(replay = 1)
-        val door = MutableSharedFlow<DataResource<Int?>>(replay = 1)
-        override fun observeSpeedMetersPerSecond(): Flow<DataResource<Float>> = speed
-        override fun observeDriverDoorPosition(): Flow<DataResource<Int?>> = door
+        val door = MutableSharedFlow<DataResource<DoorPosition>>(replay = 1)
+        var speedRequests = 0
+            private set
+
+        override fun observeSpeedMetersPerSecond(): Flow<DataResource<Float>> {
+            speedRequests++
+            return speed
+        }
+        override fun observeDriverDoorPosition(): Flow<DataResource<DoorPosition>> = door
     }
 }

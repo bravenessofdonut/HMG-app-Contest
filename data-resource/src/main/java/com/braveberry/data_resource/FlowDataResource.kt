@@ -1,5 +1,6 @@
 package com.braveberry.data_resource
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.onEach
@@ -15,7 +16,10 @@ suspend fun <T> Flow<DataResource<T>>.collectDataResource(
     onError: (Throwable) -> Unit,
     onLoading: (T?) -> Unit = {},
 ) {
-    this.catch { onError(it) }
+    this.catch { cause ->
+        if (cause is CancellationException) throw cause
+        onError(cause)
+    }
         .collect {
             when (it) {
                 is DataResource.Success -> onSuccess(it.data)
@@ -72,19 +76,14 @@ fun <T, R> Flow<DataResource<T>>.flatMapDataResource(operation: (T) -> Flow<Data
         when (resource) {
             is DataResource.Success -> emitAll(operation(resource.data))
             is DataResource.Error -> emit(DataResource.error(resource.throwable))
-            is DataResource.Loading -> {
-                val data = resource.data?.let(operation) ?: return@transform
-                emitAll(data)
-            }
+            is DataResource.Loading -> emit(DataResource.loading())
         }
     }
 
 fun <T> Flow<T>.asDataResourceFlow(): Flow<DataResource<T>> =
-    transform { value ->
-    emit(DataResource.success(value) as DataResource<T>)
-}.onStart {
-    emit(DataResource.loading())
-}.catch { e ->
-    if (e is kotlinx.coroutines.CancellationException) throw e
-    emit(DataResource.error(e))
-}
+    map<T, DataResource<T>> { DataResource.success(it) }
+        .onStart { emit(DataResource.loading()) }
+        .catch { cause ->
+            if (cause is CancellationException) throw cause
+            emit(DataResource.error(cause))
+        }

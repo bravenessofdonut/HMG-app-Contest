@@ -1,5 +1,6 @@
 package com.braveberry.vehicle.data.impl
 
+import com.braveberry.domain.model.vehicle.DoorPosition
 import com.braveberry.data_resource.DataResource
 import com.braveberry.vehicle.data.datasource.VehicleDataSource
 import kotlinx.coroutines.CancellationException
@@ -26,7 +27,14 @@ class VehicleRepositoryImplTest {
             door = flowOf(1)
         ))
         assertTrue(repo.observeSpeedMetersPerSecond().toList().last() is DataResource.Error)
-        assertEquals(1, (repo.observeDriverDoorPosition().toList().last() as DataResource.Success).data)
+        assertEquals(DoorPosition.Unrecognized(1), (repo.observeDriverDoorPosition().toList().last() as DataResource.Success).data)
+    }
+
+    @Test fun missingDoorReadingIsAnObservedValue() = runTest {
+        val repo = VehicleRepositoryImpl(FakeVehicleDataSource(door = flowOf(null)))
+        val events = repo.observeDriverDoorPosition().toList()
+        assertTrue(events.first() is DataResource.Loading)
+        assertEquals(DoorPosition.Unavailable, (events.last() as DataResource.Success).data)
     }
 
     @Test fun cancellationPropagatesInsteadOfBecomingUiError() = runTest {

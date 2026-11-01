@@ -20,15 +20,28 @@ class VehicleViewModel @Inject constructor(
     private val observeDriverDoor: ObserveDriverDoorUseCase
 ) : ViewModel(), ContainerHost<VehicleUiState, Nothing> {
     override val container = container<VehicleUiState, Nothing>(VehicleUiState())
+    private var speedPermissionGranted = false
     private var speedJob: Job? = null
     private var doorJob: Job? = null
 
     init {
-        retrySpeed()
         retryDoor()
     }
 
+    fun onSpeedPermissionChanged(granted: Boolean) {
+        if (granted == speedPermissionGranted) return
+        speedPermissionGranted = granted
+        if (granted) {
+            retrySpeed()
+        } else {
+            speedJob?.cancel()
+            speedJob = null
+            intent { reduce { state.copy(speedMetersPerSecond = Reading.Loading) } }
+        }
+    }
+
     fun retrySpeed() {
+        if (!speedPermissionGranted) return
         speedJob?.cancel()
         speedJob = viewModelScope.launch {
             observeSpeed().collect { resource ->
