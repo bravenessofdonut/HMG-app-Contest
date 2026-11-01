@@ -1,7 +1,7 @@
 package com.braveberry.vehicle.data.impl
 
-import com.braveberry.domain.model.vehicle.DoorPosition
 import com.braveberry.data_resource.DataResource
+import com.braveberry.domain.model.vehicle.DoorPosition
 import com.braveberry.vehicle.data.datasource.VehicleDataSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
@@ -23,11 +23,19 @@ class VehicleRepositoryImplTest {
 
     @Test fun speedFailureDoesNotPreventIndependentDoorRead() = runTest {
         val repo = VehicleRepositoryImpl(FakeVehicleDataSource(
-            speed = flow { throw IllegalStateException("service unavailable") },
+            speed = flow { throw java.io.IOException("service unavailable") },
             door = flowOf(1)
         ))
         assertTrue(repo.observeSpeedMetersPerSecond().toList().last() is DataResource.Error)
         assertEquals(DoorPosition.Unrecognized(1), (repo.observeDriverDoorPosition().toList().last() as DataResource.Success).data)
+    }
+
+    @Test fun permissionFailurePreservesCauseAndRecoveryType() = runTest {
+        val denied = SecurityException("CAR_SPEED")
+        val repo = VehicleRepositoryImpl(FakeVehicleDataSource(speed = flow { throw denied }))
+        val result = repo.observeSpeedMetersPerSecond().toList().last() as DataResource.Error
+        assertTrue(result.failure is com.braveberry.data_resource.ResourceFailure.PermissionRequired)
+        assertEquals(denied, result.failure.cause)
     }
 
     @Test fun missingDoorReadingIsAnObservedValue() = runTest {

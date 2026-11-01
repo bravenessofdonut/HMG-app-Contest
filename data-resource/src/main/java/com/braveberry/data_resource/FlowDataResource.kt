@@ -3,30 +3,25 @@ package com.braveberry.data_resource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.transform
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
-
+import kotlinx.coroutines.flow.transform
 
 suspend fun <T> Flow<DataResource<T>>.collectDataResource(
     onSuccess: suspend (T) -> Unit,
-    onError: (Throwable) -> Unit,
+    onError: (ResourceFailure) -> Unit,
     onLoading: (T?) -> Unit = {},
 ) {
-    this.catch { cause ->
-        if (cause is CancellationException) throw cause
-        onError(cause)
-    }
-        .collect {
-            when (it) {
-                is DataResource.Success -> onSuccess(it.data)
-                is DataResource.Error -> onError(it.throwable)
-                is DataResource.Loading -> onLoading.invoke(it.data)
-            }
+    collect {
+        when (it) {
+            is DataResource.Success -> onSuccess(it.data)
+            is DataResource.Error -> onError(it.failure)
+            is DataResource.Loading -> onLoading.invoke(it.data)
         }
+    }
 }
 
 fun <T> Flow<DataResource<T>>.onSuccess(action: suspend (T) -> Unit): Flow<DataResource<T>> =
@@ -36,10 +31,10 @@ fun <T> Flow<DataResource<T>>.onSuccess(action: suspend (T) -> Unit): Flow<DataR
         }
     }
 
-fun <T> Flow<DataResource<T>>.onError(action: suspend (Throwable) -> Unit): Flow<DataResource<T>> =
+fun <T> Flow<DataResource<T>>.onError(action: suspend (ResourceFailure) -> Unit): Flow<DataResource<T>> =
     onEach { resource ->
         if (resource is DataResource.Error) {
-            action(resource.throwable)
+            action(resource.failure)
         }
     }
 
@@ -47,18 +42,17 @@ suspend fun <T> Flow<DataResource<T>>.awaitOrThrow(): T =
     transform { resource ->
         when (resource) {
             is DataResource.Success -> emit(resource.data)
-            is DataResource.Error -> throw resource.throwable
+            is DataResource.Error -> throw resource.failure
             is DataResource.Loading -> return@transform
         }
     }.first()
-
 
 fun <Source, Destination> Flow<DataResource<Source>>.mapDataResource(mapper: (Source) -> Destination)
         : Flow<DataResource<Destination>> =
     map {
         when (it) {
             is DataResource.Success -> DataResource.success(mapper(it.data))
-            is DataResource.Error -> DataResource.error(it.throwable)
+            is DataResource.Error -> it
             is DataResource.Loading -> {
                 val newData = it.data?.let { source -> mapper(source) }
                 DataResource.loading(newData)
@@ -70,20 +64,21 @@ fun <Source, Destination> Flow<DataResource<List<Source>>>.mapListDataResource(m
         : Flow<DataResource<List<Destination>>> =
     mapDataResource { list -> list.map(mapper) }
 
-
 fun <T, R> Flow<DataResource<T>>.flatMapDataResource(operation: (T) -> Flow<DataResource<R>>): Flow<DataResource<R>> =
     transform { resource ->
         when (resource) {
             is DataResource.Success -> emitAll(operation(resource.data))
-            is DataResource.Error -> emit(DataResource.error(resource.throwable))
+            is DataResource.Error -> emit(resource)
             is DataResource.Loading -> emit(DataResource.loading())
         }
     }
 
-fun <T> Flow<T>.asDataResourceFlow(): Flow<DataResource<T>> =
+fun <T> Flow<T>.asDataResourceFlow(
+    classify: (Exception) -> ResourceFailure? = { it as? ResourceFailure }
+): Flow<DataResource<T>> =
     map<T, DataResource<T>> { DataResource.success(it) }
         .onStart { emit(DataResource.loading()) }
         .catch { cause ->
-            if (cause is CancellationException) throw cause
-            emit(DataResource.error(cause))
+            if (cause !is Exception || cause is CancellationException) throw cause
+            emit(DataResource.error(classify(cause) ?: throw cause))
         }

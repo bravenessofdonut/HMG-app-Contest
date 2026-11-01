@@ -17,7 +17,7 @@ class AaosSpeedSourceTest {
             PackageManager.PERMISSION_DENIED
 
         val result = runCatching { AaosSpeedSource(context).observe().first() }
-        assertTrue(result.exceptionOrNull() is IllegalStateException)
+        assertTrue(result.exceptionOrNull() is SecurityException)
         assertTrue(result.exceptionOrNull()?.message.orEmpty().contains("CAR_SPEED"))
     }
 }

@@ -16,6 +16,7 @@ fun VoiceRoute(onBack: () -> Unit, viewModel: VoiceViewModel = hiltViewModel()) 
         onStopSpeaking = viewModel::stopSpeaking,
         onStartListening = viewModel::startListening,
         onStopListening = viewModel::stopListening,
+        onReconnect = viewModel::connect,
         onBack = onBack
     )
 }

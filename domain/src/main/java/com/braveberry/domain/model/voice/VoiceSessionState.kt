@@ -1,11 +1,9 @@
-package com.braveberry.presentation.voice.viewmodel
-
-import com.braveberry.domain.model.voice.VoiceEvent
+package com.braveberry.domain.model.voice
 
 enum class EngineStatus { INITIALIZING, READY, ERROR }
 enum class ListeningPhase { IDLE, REQUESTED, INPUT_READY, RECOGNIZING, ENDED }
 
-data class VoiceUiState(
+data class VoiceSessionState(
     val ttsStatus: EngineStatus = EngineStatus.INITIALIZING,
     val sttStatus: EngineStatus = EngineStatus.INITIALIZING,
     val speaking: Boolean = false,
@@ -18,17 +16,24 @@ data class VoiceUiState(
     val speakerKind: VoiceEvent.SpeakerKind = VoiceEvent.SpeakerKind.UNSUPPORTED,
     val availableSpeakers: List<String> = emptyList(),
     val speakerLanguageTags: Map<String, String> = emptyMap(),
-    val speakerParameter: String = "확인 중",
+    val speakerParameter: String = "",
     val requestedSpeaker: String? = null,
-    val previewRunning: Boolean = false,
+    val stopping: Boolean = false,
+    val disconnected: Boolean = false,
     val previewTurn: String? = null,
-    val lastSttEvent: String = "아직 STT 이벤트 없음",
+    val lastSttEvent: String = "",
     val ttsError: String? = null,
     val sttError: String? = null
 ) {
-    fun applyEvent(event: VoiceEvent): VoiceUiState = when (event) {
+    val previewRunning: Boolean get() = previewTurn != null
+    val recognitionActive: Boolean get() = listening || listeningPhase == ListeningPhase.REQUESTED ||
+        listeningPhase == ListeningPhase.INPUT_READY
+    val canSpeak: Boolean get() = !disconnected && !speaking && !stopping && !recognitionActive &&
+        ttsStatus == EngineStatus.READY
+
+    fun applyEvent(event: VoiceEvent): VoiceSessionState = when (event) {
         VoiceEvent.TtsReady -> copy(ttsStatus = EngineStatus.READY, ttsError = null)
-        VoiceEvent.SttReady -> copy(sttStatus = EngineStatus.READY, sttError = null, lastSttEvent = "SDK 초기화 성공")
+        VoiceEvent.SttReady -> copy(sttStatus = EngineStatus.READY, sttError = null, lastSttEvent = "onInitialized")
         VoiceEvent.Speaking -> copy(speaking = true, ttsError = null)
         VoiceEvent.SpeechDone, VoiceEvent.SpeechStopped -> copy(speaking = false)
         VoiceEvent.Listening -> copy(
@@ -60,12 +65,12 @@ data class VoiceUiState(
             VoiceEvent.Engine.TTS -> copy(
                 speaking = false,
                 ttsStatus = if (ttsStatus == EngineStatus.READY) ttsStatus else EngineStatus.ERROR,
-                ttsError = "TTS: ${event.reason}"
+                ttsError = event.reason
             )
             VoiceEvent.Engine.STT -> copy(
                 listening = false, listeningPhase = ListeningPhase.ENDED,
                 sttStatus = if (sttStatus == EngineStatus.READY) sttStatus else EngineStatus.ERROR,
-                lastSttEvent = "onError", sttError = "STT: ${event.reason}"
+                lastSttEvent = "onError", sttError = event.reason
             )
         }
     }

@@ -2,9 +2,9 @@ package com.braveberry.presentation.vehicle.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.braveberry.data_resource.DataResource
 import com.braveberry.domain.usecase.vehicle.ObserveDriverDoorUseCase
 import com.braveberry.domain.usecase.vehicle.ObserveSpeedUseCase
+import com.braveberry.domain.usecase.voice.ObservePlaybackUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -17,7 +17,8 @@ import org.orbitmvi.orbit.viewmodel.container
 @HiltViewModel
 class VehicleViewModel @Inject constructor(
     private val observeSpeed: ObserveSpeedUseCase,
-    private val observeDriverDoor: ObserveDriverDoorUseCase
+    private val observeDriverDoor: ObserveDriverDoorUseCase,
+    private val observePlayback: ObservePlaybackUseCase
 ) : ViewModel(), ContainerHost<VehicleUiState, Nothing> {
     override val container = container<VehicleUiState, Nothing>(VehicleUiState())
     private var speedPermissionGranted = false
@@ -26,6 +27,11 @@ class VehicleViewModel @Inject constructor(
 
     init {
         retryDoor()
+        intent {
+            observePlayback().collect { playback ->
+                reduce { state.copy(playback = playback) }
+            }
+        }
     }
 
     fun onSpeedPermissionChanged(granted: Boolean) {
@@ -47,11 +53,7 @@ class VehicleViewModel @Inject constructor(
             observeSpeed().collect { resource ->
                 intent {
                     reduce {
-                        state.copy(speedMetersPerSecond = when (resource) {
-                            is DataResource.Loading -> Reading.Loading
-                            is DataResource.Success -> Reading.Ready(resource.data)
-                            is DataResource.Error -> Reading.Failed(resource.throwable.message ?: "속도 수신 오류")
-                        })
+                        state.copy(speedMetersPerSecond = resource.toReading())
                     }
                 }
             }
@@ -64,11 +66,7 @@ class VehicleViewModel @Inject constructor(
             observeDriverDoor().collect { resource ->
                 intent {
                     reduce {
-                        state.copy(driverDoorPosition = when (resource) {
-                            is DataResource.Loading -> Reading.Loading
-                            is DataResource.Success -> Reading.Ready(resource.data)
-                            is DataResource.Error -> Reading.Failed(resource.throwable.message ?: "도어 수신 오류")
-                        })
+                        state.copy(driverDoorPosition = resource.toReading())
                     }
                 }
             }

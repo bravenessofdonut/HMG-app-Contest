@@ -1,14 +1,13 @@
-package com.braveberry.presentation.voice.viewmodel
+package com.braveberry.domain.model.voice
 
-import com.braveberry.domain.model.voice.VoiceEvent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class VoiceUiStateTest {
+class VoiceSessionStateTest {
     @Test fun transcriptionPreservesIntermediateAndFinalResult() {
-        val ready = VoiceUiState().applyEvent(VoiceEvent.SttReady)
+        val ready = VoiceSessionState().applyEvent(VoiceEvent.SttReady)
         assertEquals(EngineStatus.READY, ready.sttStatus)
         val listening = ready.applyEvent(VoiceEvent.Listening)
         assertTrue(listening.listening)
@@ -21,17 +20,17 @@ class VoiceUiStateTest {
     }
 
     @Test fun ttsErrorDoesNotResetSttReadiness() {
-        val ready = VoiceUiState().applyEvent(VoiceEvent.SttReady)
+        val ready = VoiceSessionState().applyEvent(VoiceEvent.SttReady)
         val failed = ready.applyEvent(VoiceEvent.Failed(VoiceEvent.Engine.TTS, "SERVICE_ERROR"))
         assertEquals(EngineStatus.READY, failed.sttStatus)
         assertEquals(EngineStatus.ERROR, failed.ttsStatus)
-        assertEquals("TTS: SERVICE_ERROR", failed.ttsError)
+        assertEquals("SERVICE_ERROR", failed.ttsError)
         assertEquals(null, failed.sttError)
     }
 
     @Test fun speakerChoicesAreActualSdkValues() {
         val options = listOf("ONE", "TWO")
-        val state = VoiceUiState().applyEvent(
+        val state = VoiceSessionState().applyEvent(
             VoiceEvent.SpeakerSupport(VoiceEvent.SpeakerKind.ENUM_VALUES, options, "SpeakerType")
         )
         assertEquals(options, state.availableSpeakers)
@@ -40,7 +39,7 @@ class VoiceUiStateTest {
     }
 
     @Test fun sttDiagnosticsKeepFinalTranscriptAfterRecognitionEnds() {
-        val listening = VoiceUiState().applyEvent(VoiceEvent.SttReady)
+        val listening = VoiceSessionState().applyEvent(VoiceEvent.SttReady)
             .applyEvent(VoiceEvent.SttInputReady)
             .applyEvent(VoiceEvent.Listening)
             .applyEvent(VoiceEvent.SttRms(12.0))

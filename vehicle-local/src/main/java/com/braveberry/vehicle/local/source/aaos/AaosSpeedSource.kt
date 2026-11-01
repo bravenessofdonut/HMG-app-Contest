@@ -3,6 +3,8 @@ package com.braveberry.vehicle.local.source.aaos
 import android.content.Context
 import android.content.pm.PackageManager
 import dagger.hilt.android.qualifiers.ApplicationContext
+import android.util.Log
+import java.io.IOException
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Proxy
 import javax.inject.Inject
@@ -23,9 +25,10 @@ class AaosSpeedSource @Inject constructor(@ApplicationContext private val contex
         var manager: Any? = null
         var callback: Any? = null
         var callbackType: Class<*>? = null
+        var registered = false
         try {
-            check(context.checkSelfPermission(SPEED_PERMISSION) == PackageManager.PERMISSION_GRANTED) {
-                "차량 속도 접근 권한이 없음: CAR_SPEED"
+            if (context.checkSelfPermission(SPEED_PERMISSION) != PackageManager.PERMISSION_GRANTED) {
+                throw SecurityException("CAR_SPEED")
             }
             val carType = Class.forName("android.car.Car")
             val propertyType = Class.forName("android.car.VehiclePropertyIds")
@@ -37,16 +40,20 @@ class AaosSpeedSource @Inject constructor(@ApplicationContext private val contex
             callbackType = listenerType
 
             car = carType.getMethod("createCar", Context::class.java).invoke(null, context)
-                ?: error("AAOS Car Service 연결에 실패함")
+                ?: throw IOException("AAOS Car Service 연결에 실패함")
             val service = carType.getField("PROPERTY_SERVICE").get(null) as String
             manager = carType.getMethod("getCarManager", String::class.java)
-                .invoke(car, service) ?: error("CarPropertyManager가 없음")
+                .invoke(car, service) ?: throw IOException("CarPropertyManager가 없음")
 
             callback = Proxy.newProxyInstance(listenerType.classLoader, arrayOf(listenerType)) { proxy, method, args ->
                 when (method.name) {
                     "hashCode" -> return@newProxyInstance System.identityHashCode(proxy)
                     "equals" -> return@newProxyInstance (proxy === args?.firstOrNull())
                     "toString" -> return@newProxyInstance "SpeedPropertyListener"
+                }
+                if (method.name == "onErrorEvent" && args?.firstOrNull() == id) {
+                    close(IOException("Vehicle speed callback failed"))
+                    return@newProxyInstance null
                 }
                 if (method.name == "onChangeEvent" && !args.isNullOrEmpty()) {
                     runCatching {
@@ -58,47 +65,56 @@ class AaosSpeedSource @Inject constructor(@ApplicationContext private val contex
                             val speed = value.javaClass.getMethod("getValue").invoke(value) as? Number
                             if (speed != null) trySend(speed.toFloat())
                         }
-                    }.onFailure { close(it) }
+                    }.onFailure { failure ->
+                        close((failure as? InvocationTargetException)?.targetException ?: failure)
+                    }
                 }
                 null
             }
-            val registered = mgrType.getMethod(
+            registered = mgrType.getMethod(
                 "registerCallback", listenerType, Int::class.javaPrimitiveType, Float::class.javaPrimitiveType
             ).invoke(manager, callback, id, 5f) as Boolean
-            check(registered) { "PERF_VEHICLE_SPEED를 구독할 수 없음" }
+            if (!registered) throw IOException("PERF_VEHICLE_SPEED 구독 실패")
             // 구독 후 첫 읽기. 초기값이 일시적으로 없더라도 업데이트 구독은 유지함.
             try {
                 val value = mgrType.getMethod(
                     "getFloatProperty", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType
                 ).invoke(manager, id, 0) as Float
                 trySend(value)
-            } catch (_: ReflectiveOperationException) {
-                // 즉시 읽기 실패는 콜백으로 오는 첫 값을 기다림.
-            } catch (_: IllegalStateException) {
-                // 일시적으로 조회할 수 없더라도 구독 유지.
+            } catch (failure: InvocationTargetException) {
+                if (failure.targetException is kotlinx.coroutines.CancellationException) throw failure
+                if (failure.targetException !is IllegalStateException) throw failure
             }
-            awaitClose {
-                runCatching {
-                    mgrType.getMethod("unregisterCallback", listenerType).invoke(manager, callback)
-                }
-                runCatching { carType.getMethod("disconnect").invoke(car) }
-            }
-        } catch (t: Throwable) {
-            val cause = (t as? InvocationTargetException)?.targetException ?: t
-            close(cause)
+            awaitClose()
+        } catch (failure: InvocationTargetException) {
+            val cause = failure.targetException
+            if (cause is kotlinx.coroutines.CancellationException) throw cause
+            if (cause is IllegalStateException) throw IOException("Car service unavailable", cause)
+            throw cause
+        } finally {
             val managerToClose = manager
             val callbackToClose = callback
             val typeToClose = callbackType
-            if (managerToClose != null && callbackToClose != null && typeToClose != null) runCatching {
+            if (registered && managerToClose != null && callbackToClose != null && typeToClose != null) cleanup {
                 managerToClose.javaClass.getMethod("unregisterCallback", typeToClose)
                     .invoke(managerToClose, callbackToClose)
             }
             val carToClose = car
-            if (carToClose != null) runCatching {
+            if (carToClose != null) cleanup {
                 carToClose.javaClass.getMethod("disconnect").invoke(carToClose)
             }
         }
     }.flowOn(Dispatchers.IO)
+
+    private fun cleanup(action: () -> Unit) {
+        try {
+            action()
+        } catch (failure: ReflectiveOperationException) {
+            val cause = (failure as? InvocationTargetException)?.targetException ?: failure
+            if (cause is Error || cause is kotlinx.coroutines.CancellationException) throw cause
+            Log.w("AaosSpeedSource", "Vehicle callback cleanup failed", cause)
+        }
+    }
 
     private companion object {
         const val SPEED_PERMISSION = "android.car.permission.CAR_SPEED"

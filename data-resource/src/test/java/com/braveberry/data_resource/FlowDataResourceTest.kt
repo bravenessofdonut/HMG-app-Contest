@@ -11,7 +11,7 @@ import org.junit.Test
 
 class FlowDataResourceTest {
     @Test fun onlySuccessStartsTheNextOperation() = runTest {
-        val cause = IllegalStateException("offline")
+        val cause = ResourceFailure.ServiceUnavailable(java.io.IOException("offline"))
         val calls = mutableListOf<Int>()
         val results = flowOf<DataResource<Int>>(
             DataResource.loading(), DataResource.loading(1), DataResource.success(2), DataResource.error(cause)
@@ -24,7 +24,7 @@ class FlowDataResourceTest {
         assertEquals(4, results.size)
         assertTrue(results[0] is DataResource.Loading && results[1] is DataResource.Loading)
         assertEquals("2", (results[2] as DataResource.Success).data)
-        assertEquals(cause, (results[3] as DataResource.Error).throwable)
+        assertEquals(cause, (results[3] as DataResource.Error).failure)
     }
 
     @Test fun collectingDoesNotReportCancellationAsFailure() = runTest {
@@ -40,6 +40,12 @@ class FlowDataResourceTest {
         }
     }
 
+    @Test(expected = IllegalArgumentException::class)
+    fun programmingErrorEscapesTheResourceBoundary() = runTest {
+        flow<Int> { throw IllegalArgumentException("invalid mapping") }.asDataResourceFlow().toList()
+        Unit
+    }
+
     @Test fun wrapsSuccessWithLoading() = runTest {
         val events = flowOf(2, 3).asDataResourceFlow().toList()
         assertTrue(events.first() is DataResource.Loading)
@@ -47,8 +53,8 @@ class FlowDataResourceTest {
         assertEquals(3, (events[2] as DataResource.Success).data)
     }
 
-    @Test fun translatesOrdinaryUpstreamExceptionToError() = runTest {
-        val events = flow<Int> { throw IllegalStateException("offline") }.asDataResourceFlow().toList()
+    @Test fun translatesClassifiedServiceFailureToError() = runTest {
+        val events = flow<Int> { throw ResourceFailure.ServiceUnavailable(java.io.IOException("offline")) }.asDataResourceFlow().toList()
         assertTrue(events.last() is DataResource.Error)
     }
 

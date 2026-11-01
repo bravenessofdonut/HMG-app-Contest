@@ -31,6 +31,7 @@ dependencies {
     implementation(project(":voice-data"))
     implementation(project(":voice-local"))
     implementation(libs.androidx.hilt.navigation.compose)
-    androidTestImplementation("com.google.dagger:hilt-android-testing:${libs.versions.hilt.get()}")
+    androidTestImplementation(project(":domain"))
+    androidTestImplementation(libs.hilt.testing)
     kspAndroidTest(libs.hilt.compiler)
 }

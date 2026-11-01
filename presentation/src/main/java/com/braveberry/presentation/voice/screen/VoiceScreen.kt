@@ -22,20 +22,20 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.braveberry.domain.model.voice.EngineStatus
 import com.braveberry.domain.model.voice.VoiceEvent
-import com.braveberry.presentation.voice.viewmodel.EngineStatus
-import com.braveberry.presentation.voice.viewmodel.ListeningPhase
-import com.braveberry.presentation.voice.viewmodel.VoiceUiState
+import com.braveberry.domain.model.voice.VoiceSessionState
 import java.util.Locale
 
 @Composable
 fun VoiceScreen(
-    state: VoiceUiState,
+    state: VoiceSessionState,
     onSpeak: (String, String) -> Unit,
     onPreviewDialogue: (String, String, String, String) -> Unit,
     onStopSpeaking: () -> Unit,
     onStartListening: () -> Unit,
     onStopListening: () -> Unit,
+    onReconnect: () -> Unit,
     onBack: () -> Unit
 ) {
     var text by rememberSaveable { mutableStateOf("안녕하세요. Pleos TTS 음성 테스트입니다.") }
@@ -52,11 +52,15 @@ fun VoiceScreen(
     val choiceAvailable = values.isNotEmpty() &&
         (state.speakerKind == VoiceEvent.SpeakerKind.MANUAL_STRING ||
             state.speakerKind == VoiceEvent.SpeakerKind.ENUM_VALUES)
-    val canPlay = state.ttsStatus == EngineStatus.READY && !state.listening && !state.speaking
+    val canPlay = state.canSpeak
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        if (state.disconnected) {
+            Text("음성 이벤트 연결이 끊겼습니다")
+            Button(onClick = onReconnect) { Text("음성 서비스 다시 연결") }
+        }
         Text("Pleos 음성 실험실", style = MaterialTheme.typography.headlineSmall)
         Text("Pleos Speech Service 3.3.1 · ON_DEVICE · ko-KR")
         Text("TTS: ${state.ttsStatus.label()}" + if (state.speaking) " · 재생 중" else "")
@@ -81,7 +85,7 @@ fun VoiceScreen(
                 enabled = canPlay && text.isNotBlank()) {
                 Text("TTS 재생")
             }
-            Button(onClick = onStopSpeaking, enabled = state.speaking || state.previewRunning) { Text("중지") }
+            Button(onClick = onStopSpeaking, enabled = !state.stopping && (state.speaking || state.previewRunning)) { Text("중지") }
         }
         HorizontalDivider()
         Text("2인 팟캐스트 대화 시연", style = MaterialTheme.typography.titleMedium)
@@ -110,17 +114,17 @@ fun VoiceScreen(
         Text("발화 구간(on/off): ${state.sttEndpoint?.toString() ?: "대기 중"}")
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = onStartListening,
-                enabled = state.sttStatus == EngineStatus.READY && !state.listening && !state.speaking &&
-                    !state.previewRunning && state.listeningPhase != ListeningPhase.REQUESTED) {
+                enabled = !state.disconnected && state.sttStatus == EngineStatus.READY && !state.recognitionActive && !state.speaking &&
+                    !state.previewRunning) {
                 Text("STT 시작")
             }
             Button(onClick = onStopListening,
-                enabled = state.listening || state.listeningPhase == ListeningPhase.REQUESTED) { Text("STT 중지") }
+                enabled = state.recognitionActive) { Text("STT 중지") }
         }
         Text("인식 결과: ${state.transcript.ifBlank { "아직 없음" }}")
         Text(if (state.transcriptCompleted) "최종 결과" else "중간 결과 또는 대기 중")
-        state.ttsError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        state.sttError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        state.ttsError?.let { Text("TTS: $it", color = MaterialTheme.colorScheme.error) }
+        state.sttError?.let { Text("STT: $it", color = MaterialTheme.colorScheme.error) }
         Text("실제 STT 테스트는 Pleos 에뮬레이터 마이크 접근을 설정해야 함")
         Button(onClick = onBack) { Text("차량 화면으로") }
     }
@@ -129,7 +133,7 @@ fun VoiceScreen(
 @Composable
 private fun SpeakerPicker(
     title: String,
-    state: VoiceUiState,
+    state: VoiceSessionState,
     value: String,
     onChange: (String) -> Unit,
     allowDefault: Boolean = false

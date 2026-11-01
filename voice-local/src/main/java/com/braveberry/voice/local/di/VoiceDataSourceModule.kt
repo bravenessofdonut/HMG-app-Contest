@@ -5,13 +5,11 @@ import com.braveberry.voice.local.impl.PleosVoiceDataSourceImpl
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
-import dagger.hilt.android.components.ViewModelComponent
-import dagger.hilt.android.scopes.ViewModelScoped
+import dagger.hilt.android.components.ActivityRetainedComponent
 
 @Module
-@InstallIn(ViewModelComponent::class)
+@InstallIn(ActivityRetainedComponent::class)
 internal abstract class VoiceDataSourceModule {
     @Binds
-    @ViewModelScoped
     abstract fun bindVoiceDataSource(impl: PleosVoiceDataSourceImpl): VoiceDataSource
 }

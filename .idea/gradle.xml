@@ -29,6 +29,8 @@
             <option value="$PROJECT_DIR$/presentation" />
             <option value="$PROJECT_DIR$/vehicle-data" />
             <option value="$PROJECT_DIR$/vehicle-local" />
+            <option value="$PROJECT_DIR$/voice-data" />
+            <option value="$PROJECT_DIR$/voice-local" />
           </set>
         </option>
       </GradleProjectSettings>
