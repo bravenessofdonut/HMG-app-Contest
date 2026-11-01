@@ -23,6 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.braveberry.domain.model.voice.EngineStatus
+import com.braveberry.domain.model.voice.PlaybackPhase
 import com.braveberry.domain.model.voice.VoiceEvent
 import com.braveberry.domain.model.voice.VoiceSessionState
 import java.util.Locale
@@ -47,8 +48,9 @@ fun VoiceScreen(
     // 기본 음성은 setSpeakerType()을 호출하지 않음.
     val values = state.availableSpeakers
     val mainSpeaker = rawMain.takeIf { it in values }.orEmpty()
-    val aSpeaker = rawA.takeIf { it in values } ?: values.firstOrNull().orEmpty()
-    val bSpeaker = rawB.takeIf { it in values } ?: values.getOrNull(1).orEmpty()
+    val koreanSpeakers = values.filter { state.speakerLanguageTags[it] == "ko-KR" }
+    val aSpeaker = rawA.takeIf { it in koreanSpeakers } ?: koreanSpeakers.firstOrNull().orEmpty()
+    val bSpeaker = rawB.takeIf { it in koreanSpeakers } ?: koreanSpeakers.getOrNull(1).orEmpty()
     val choiceAvailable = values.isNotEmpty() &&
         (state.speakerKind == VoiceEvent.SpeakerKind.MANUAL_STRING ||
             state.speakerKind == VoiceEvent.SpeakerKind.ENUM_VALUES)
@@ -64,7 +66,7 @@ fun VoiceScreen(
         Text("Pleos 음성 실험실", style = MaterialTheme.typography.headlineSmall)
         Text("Pleos Speech Service 3.3.1 · ON_DEVICE · ko-KR")
         Text("TTS: ${state.ttsStatus.label()}" + if (state.speaking) " · 재생 중" else "")
-        Text("화자 타입: ${state.speakerParameter}")
+        Text("재생 단계: ${state.playback.phase.label()}")
         when (state.speakerKind) {
             VoiceEvent.SpeakerKind.ENUM_VALUES -> Text("SDK에서 제공하는 화자 목록 사용 중")
             VoiceEvent.SpeakerKind.MANUAL_STRING -> Text("공식 문서에 안내된 화자 10명 · 언어별 선택 가능")
@@ -91,9 +93,9 @@ fun VoiceScreen(
         Text("2인 팟캐스트 대화 시연", style = MaterialTheme.typography.titleMedium)
         Text("현재는 준비된 문장 두 개를 순서대로 읽는 테스트임. AI 대본 생성 기능은 포함하지 않음")
         if (choiceAvailable) {
-            SpeakerPicker("진행자 A", state, aSpeaker, { rawA = it })
-            SpeakerPicker("진행자 B", state, bSpeaker, { rawB = it })
-            Text("선택한 화자 언어에 따라 TTS locale도 변경됨. 각 언어의 문장으로 시험하는 것을 권장함")
+            SpeakerPicker("진행자 A", state, aSpeaker, { rawA = it }, koreanOnly = true)
+            SpeakerPicker("진행자 B", state, bSpeaker, { rawB = it }, koreanOnly = true)
+            Text("한국어 2인 시연: 서로 다른 한국어 화자만 선택 가능. 외국어는 단일 TTS에서 시험")
         }
         OutlinedTextField(modifier = Modifier.fillMaxWidth(), value = aText,
             onValueChange = { aText = it }, label = { Text("A 대사") })
@@ -101,7 +103,7 @@ fun VoiceScreen(
             onValueChange = { bText = it }, label = { Text("B 대사") })
         Button(onClick = { onPreviewDialogue(aText, bText, aSpeaker, bSpeaker) },
             enabled = canPlay && choiceAvailable && aSpeaker.isNotBlank() && bSpeaker.isNotBlank() &&
-                aSpeaker != bSpeaker && aText.isNotBlank() && bText.isNotBlank()) {
+                state.canPreview(aSpeaker, bSpeaker) && aText.isNotBlank() && bText.isNotBlank()) {
             Text("A → B 순차 재생")
         }
         if (state.previewRunning) Text("진행자 ${state.previewTurn} 재생 중 · onDone 후 다음 발화")
@@ -109,7 +111,6 @@ fun VoiceScreen(
         HorizontalDivider()
         Text("STT 실시간 상태", style = MaterialTheme.typography.titleMedium)
         Text("서비스: ${state.sttStatus.label()} · 단계: ${state.listeningPhase.name}")
-        Text("마지막 SDK 이벤트: ${state.lastSttEvent}")
         Text("입력 RMS (SDK 원본 단위): ${state.sttRms?.toString() ?: "대기 중"}")
         Text("발화 구간(on/off): ${state.sttEndpoint?.toString() ?: "대기 중"}")
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -136,19 +137,21 @@ private fun SpeakerPicker(
     state: VoiceSessionState,
     value: String,
     onChange: (String) -> Unit,
-    allowDefault: Boolean = false
+    allowDefault: Boolean = false,
+    koreanOnly: Boolean = false
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
-    // 화자 이름·언어 정보는 SDK 어댑터가 제공함. UI에는 중복 목록을 두지 않음.
+    // 언어 필터는 UI 편의이고, 명령 처리 계층에서도 다시 검증함.
+    val allowed = state.availableSpeakers.filter { !koreanOnly || state.speakerLanguageTags[it] == "ko-KR" }
     val groups = if (state.speakerKind == VoiceEvent.SpeakerKind.MANUAL_STRING) {
-        state.availableSpeakers.groupBy { state.speakerLanguageTags[it] }.map { (tag, names) ->
+        allowed.groupBy { state.speakerLanguageTags[it] }.map { (tag, names) ->
             val label = if (tag.isNullOrBlank()) "기타" else {
                 "${Locale.forLanguageTag(tag).getDisplayLanguage(Locale.KOREAN)} ($tag)"
             }
             label to names
         }
     } else {
-        listOf("SDK 제공 화자" to state.availableSpeakers)
+        listOf("SDK 제공 화자" to allowed)
     }
 
     Column {
@@ -185,4 +188,12 @@ private fun EngineStatus.label(): String = when (this) {
     EngineStatus.INITIALIZING -> "초기화 중"
     EngineStatus.READY -> "준비 완료"
     EngineStatus.ERROR -> "초기화 실패"
+}
+
+private fun PlaybackPhase.label(): String = when (this) {
+    PlaybackPhase.Idle -> "대기"
+    is PlaybackPhase.Starting -> "시작 이벤트 대기"
+    is PlaybackPhase.Playing -> "재생 중 (완료 대기)"
+    is PlaybackPhase.Stopping -> "중지 이벤트 대기"
+    is PlaybackPhase.Failed -> "복구 필요: $reason"
 }

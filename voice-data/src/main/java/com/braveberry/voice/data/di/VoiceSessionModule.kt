@@ -2,6 +2,8 @@ package com.braveberry.voice.data.di
 
 import com.braveberry.domain.repository.VoiceRepository
 import com.braveberry.domain.usecase.voice.VoiceSession
+import com.braveberry.domain.usecase.voice.VoiceSessionOwner
+import com.braveberry.voice.data.impl.VoiceSessionImpl
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -19,13 +21,19 @@ import kotlinx.coroutines.cancel
 internal object VoiceSessionModule {
     @Provides
     @ActivityRetainedScoped
-    fun provideSession(engines: Provider<VoiceRepository>, lifecycle: ActivityRetainedLifecycle): VoiceSession {
+    fun provideRuntime(engines: Provider<VoiceRepository>, lifecycle: ActivityRetainedLifecycle): VoiceSessionImpl {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-        val session = VoiceSession(engines::get, scope)
+        val session = VoiceSessionImpl(engines::get, scope)
         lifecycle.addOnClearedListener {
+            session.shutdown()
             scope.cancel()
-            session.disconnect()
         }
         return session
     }
+
+    @Provides
+    fun provideSession(runtime: VoiceSessionImpl): VoiceSession = runtime
+
+    @Provides
+    fun provideSessionOwner(runtime: VoiceSessionImpl): VoiceSessionOwner = runtime
 }

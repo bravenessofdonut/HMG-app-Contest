@@ -1,68 +1,50 @@
 package com.braveberry.domain.usecase.voice
 
-import com.braveberry.domain.model.voice.VoiceEvent
-import com.braveberry.domain.repository.VoiceRepository
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.test.runTest
+import com.braveberry.domain.model.voice.PlaybackPhase
+import com.braveberry.domain.model.voice.PlaybackPlan
+import com.braveberry.domain.model.voice.VoiceSessionState
+import com.braveberry.domain.model.voice.VoiceTurn
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
-@OptIn(ExperimentalCoroutinesApi::class)
+/** SDK 없이 재생 정책 자체를 검증함. */
 class VoiceSessionTest {
-    @Test fun leavingAndReenteringKeepsTheTurnWithoutRestartingTheEngine() = runTest {
-        val engine = FakeEngine()
-        val session = VoiceSession({ engine }, backgroundScope)
-        session.attachScreen()
-        runCurrent()
-        session.previewDialogue("first", "second", "one", "two")
-        session.detachScreen()
-        assertEquals(Playback.Speaking("A"), ObservePlaybackUseCase(session)().first())
-        engine.send(VoiceEvent.SpeechDone)
-        runCurrent()
-        session.attachScreen()
-        assertEquals("B", session.state.value.previewTurn)
-        assertEquals(listOf("init", "first", "second"), engine.calls)
-        session.detachScreen()
-        engine.send(VoiceEvent.SpeechDone)
-        runCurrent()
-        assertEquals(listOf("init", "first", "second", "release"), engine.calls)
+    private val first = VoiceTurn("첫 대사", "eunwoo", "A")
+    private val second = VoiceTurn("둘째 대사", "haeun", "B")
+
+    @Test fun onlyAcknowledgedPlayingCanAdvanceToNextTurn() {
+        val starting = PlaybackPlan().begin(first, second)!!
+        assertNull(starting.finished()) // onStart 없이 온 오래된 onDone은 성공 취급하지 않음.
+        val playing = starting.started()!!
+        val completed = playing.finished()!!
+        assertEquals(second, completed.following)
+        assertEquals(PlaybackPhase.Idle, completed.completed.phase)
     }
 
-    @Test fun completionAfterStopDoesNotStartTheSecondTurn() = runTest {
-        val engine = FakeEngine()
-        val session = VoiceSession({ engine }, backgroundScope)
-        session.attachScreen()
-        runCurrent()
-        session.previewDialogue("first", "second", "one", "two")
-        session.stopSpeaking()
-        engine.send(VoiceEvent.SpeechDone)
-        runCurrent()
-        assertEquals(Playback.Idle, ObservePlaybackUseCase(session)().first())
-        assertEquals(listOf("init", "first", "stop"), engine.calls)
-        session.detachScreen()
+    @Test fun stoppingDiscardsThePendingTurnAndCannotAcceptAnotherStart() {
+        val stopping = PlaybackPlan().begin(first, second)!!.started()!!.requestStop()!!
+        assertNull(stopping.begin(second))
+        assertNull(stopping.finished())
+        assertNull(stopping.next)
+        assertEquals(PlaybackPhase.Idle, stopping.stopped()!!.phase)
     }
 
-    private class FakeEngine : VoiceRepository {
-        private val queue = Channel<VoiceEvent>(8)
-        override val events = queue.receiveAsFlow()
-        val calls = mutableListOf<String>()
-        fun send(event: VoiceEvent) { queue.trySend(event).getOrThrow() }
-        override fun initialize() {
-            calls += "init"
-            send(VoiceEvent.TtsReady)
-        }
-        override fun selectSpeaker(value: String) = true
-        override fun speak(text: String) { calls += text }
-        override fun stopSpeaking() { calls += "stop" }
-        override fun startListening() = Unit
-        override fun stopListening() = Unit
-        override fun release() {
-            calls += "release"
-            queue.close()
-        }
+    @Test fun failedStateCannotStartAnotherTurnWithoutNewSession() {
+        val failed = PlaybackPlan().begin(first)!!.failed("START_TIMEOUT")
+        assertTrue(failed.phase is PlaybackPhase.Failed)
+        assertNull(failed.begin(second))
+    }
+
+    @Test fun koreanOnlyPodcastIsEnforcedBySessionState() {
+        val state = VoiceSessionState(speakerLanguageTags = mapOf(
+            "eunwoo" to "ko-KR", "haeun" to "ko-KR", "sabine" to "fr-CA"
+        ))
+        assertTrue(state.canPreview("eunwoo", "haeun"))
+        assertFalse(state.canPreview("sabine", "eunwoo"))
+        assertFalse(state.canPreview("eunwoo", "eunwoo"))
     }
 }
