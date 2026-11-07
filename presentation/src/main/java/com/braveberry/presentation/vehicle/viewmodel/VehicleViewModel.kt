@@ -1,0 +1,75 @@
+package com.braveberry.presentation.vehicle.viewmodel
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.braveberry.domain.usecase.vehicle.ObserveDriverDoorUseCase
+import com.braveberry.domain.usecase.vehicle.ObserveSpeedUseCase
+import com.braveberry.domain.usecase.voice.ObservePlaybackUseCase
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import org.orbitmvi.orbit.ContainerHost
+import org.orbitmvi.orbit.syntax.simple.intent
+import org.orbitmvi.orbit.syntax.simple.reduce
+import org.orbitmvi.orbit.viewmodel.container
+
+@HiltViewModel
+class VehicleViewModel @Inject constructor(
+    private val observeSpeed: ObserveSpeedUseCase,
+    private val observeDriverDoor: ObserveDriverDoorUseCase,
+    private val observePlayback: ObservePlaybackUseCase
+) : ViewModel(), ContainerHost<VehicleUiState, Nothing> {
+    override val container = container<VehicleUiState, Nothing>(VehicleUiState())
+    private var speedPermissionGranted = false
+    private var speedJob: Job? = null
+    private var doorJob: Job? = null
+
+    init {
+        retryDoor()
+        intent {
+            observePlayback().collect { playback ->
+                reduce { state.copy(playback = playback) }
+            }
+        }
+    }
+
+    fun onSpeedPermissionChanged(granted: Boolean) {
+        if (granted == speedPermissionGranted) return
+        speedPermissionGranted = granted
+        if (granted) {
+            retrySpeed()
+        } else {
+            speedJob?.cancel()
+            speedJob = null
+            intent { reduce { state.copy(speedMetersPerSecond = Reading.Loading) } }
+        }
+    }
+
+    fun retrySpeed() {
+        if (!speedPermissionGranted) return
+        speedJob?.cancel()
+        speedJob = viewModelScope.launch {
+            observeSpeed().collect { resource ->
+                intent {
+                    reduce {
+                        state.copy(speedMetersPerSecond = resource.toReading())
+                    }
+                }
+            }
+        }
+    }
+
+    fun retryDoor() {
+        doorJob?.cancel()
+        doorJob = viewModelScope.launch {
+            observeDriverDoor().collect { resource ->
+                intent {
+                    reduce {
+                        state.copy(driverDoorPosition = resource.toReading())
+                    }
+                }
+            }
+        }
+    }
+}

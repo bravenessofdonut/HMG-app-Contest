@@ -14,9 +14,10 @@ kotlin {
 }
 
 dependencies {
+    testImplementation(gradleTestKit())
+    testImplementation(libs.junit)
     compileOnly(libs.android.gradlePlugin)
     compileOnly(libs.kotlin.gradlePlugin)
-    compileOnly(libs.kotlin.serialization.gradlePlugin)
 }
 
 gradlePlugin {
@@ -69,4 +70,10 @@ gradlePlugin {
             implementationClass = "AndroidComposeConventionPlugin"
         }
     }
+}
+
+tasks.test {
+    val catalog = rootProject.file("../gradle/libs.versions.toml")
+    inputs.file(catalog)
+    systemProperty("guide.versionCatalog", catalog.absolutePath)
 }

@@ -15,7 +15,6 @@ class JvmLibraryConventionPlugin : Plugin<Project> {
         with(target) {
             with(pluginManager) {
                 apply("org.jetbrains.kotlin.jvm")
-                apply("org.jetbrains.kotlin.plugin.serialization")
             }
             extensions.configure<JavaPluginExtension> {
                 sourceCompatibility = JavaVersion.VERSION_11
@@ -32,7 +31,6 @@ class JvmLibraryConventionPlugin : Plugin<Project> {
             dependencies {
                 add("implementation", libs.findLibrary("kotlinx.coroutines.core").get())
                 add("testImplementation", libs.findLibrary("junit").get())
-                add("implementation", libs.findLibrary("kotlinx-serialization-json").get())
                 add("testImplementation", libs.findLibrary("mockk").get())
                 add("testImplementation", libs.findLibrary("kotlinx.coroutines.test").get()) // runTest 사용용
             }
