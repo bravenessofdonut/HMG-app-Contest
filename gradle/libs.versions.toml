@@ -45,7 +45,14 @@ navigationCompose = "2.9.8"
 appcompat = "1.8.0"
 material = "1.14.0"
 
+firebaseBom = "35.1.0"
+androidxJunitKtx = "1.3.0"
 [libraries]
+
+firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
+firebase-ai = { module = "com.google.firebase:firebase-ai" }
+androidx-junit-ktx = { module = "androidx.test.ext:junit-ktx", version.ref = "androidxJunitKtx" }
+
 pleos-vehicle = { module = "ai.pleos.playground:Vehicle", version.ref = "pleosVehicle" }
 pleos-tts = { module = "ai.pleos.playground:TextToSpeech", version.ref = "pleosSpeech" }
 pleos-stt = { module = "ai.pleos.playground:SpeechToText", version.ref = "pleosSpeech" }

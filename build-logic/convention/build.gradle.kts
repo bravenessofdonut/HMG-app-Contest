@@ -69,6 +69,11 @@ gradlePlugin {
             id = "braveberry.android.compose"
             implementationClass = "AndroidComposeConventionPlugin"
         }
+
+        register("androidTest") {
+            id = "braveberry.android.test"
+            implementationClass = "AndroidTestConventionPlugin"
+        }
     }
 }
 
