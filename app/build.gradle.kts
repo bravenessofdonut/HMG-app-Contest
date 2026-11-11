@@ -30,6 +30,8 @@ dependencies {
     implementation(project(":vehicle-local"))
     implementation(project(":voice-data"))
     implementation(project(":voice-local"))
+    implementation(project(":navi-data"))
+    implementation(project(":navi-local"))
     implementation(libs.androidx.hilt.navigation.compose)
     androidTestImplementation(project(":domain"))
     androidTestImplementation(libs.hilt.testing)

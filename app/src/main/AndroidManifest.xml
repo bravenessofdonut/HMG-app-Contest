@@ -9,6 +9,12 @@
     <!-- Pleos Speech Service: 차량 TTS/STT 접근 -->
     <uses-permission android:name="pleos.car.permission.TTS_SERVICE" />
     <uses-permission android:name="pleos.car.permission.STT_SERVICE" />
+    <!-- NaviHelper 요청별 권한은 앱 설치 시 선언해 둠. -->
+    <uses-permission android:name="pleos.car.permission.NAVI_ROUTE" />
+    <uses-permission android:name="pleos.car.permission.NAVI_ROUTE_SEARCH" />
+    <uses-permission android:name="pleos.car.permission.NAVI_CUSTOM_MAP" />
+    <uses-permission android:name="pleos.car.permission.NAVI_CUSTOM_ROUTE" />
+    <uses-permission android:name="pleos.car.permission.NAVI_CUSTOM_ETC" />
     <uses-feature android:name="android.hardware.type.automotive" android:required="false" />
 
     <application
