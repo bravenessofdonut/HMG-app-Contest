@@ -9,6 +9,7 @@
     <!-- Pleos Speech Service: 차량 TTS/STT 접근 -->
     <uses-permission android:name="pleos.car.permission.TTS_SERVICE" />
     <uses-permission android:name="pleos.car.permission.STT_SERVICE" />
+    <uses-permission android:name="pleos.car.permission.FUSED_LOCATION" />
     <uses-feature android:name="android.hardware.type.automotive" android:required="false" />
 
     <application

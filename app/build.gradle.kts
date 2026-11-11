@@ -72,11 +72,15 @@ dependencies {
     implementation(project(":ai-data"))
     implementation(project(":ai-remote"))
 
+    implementation(project(":location-data"))
+    implementation(project(":location-local"))
     implementation(libs.androidx.hilt.navigation.compose)
 
     // 기존 Android 테스트
     androidTestImplementation(project(":domain"))
     androidTestImplementation(libs.hilt.testing)
+    androidTestImplementation("androidx.test:rules:1.7.0")
+    androidTestImplementation(libs.kotlinx.coroutines.core)
     kspAndroidTest(libs.hilt.compiler)
 
     // Firebase AI 테스트
