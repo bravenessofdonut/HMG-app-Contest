@@ -5,7 +5,6 @@ import com.braveberry.ai.remote.model.GuideRequestDto
 
 fun GuideRequestDataModel.toDto(): GuideRequestDto =
     GuideRequestDto(
-        placeName = placeName,
         region = region,
         language = language
     )

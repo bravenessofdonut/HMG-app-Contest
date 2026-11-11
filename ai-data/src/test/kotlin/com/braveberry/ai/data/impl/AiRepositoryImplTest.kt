@@ -22,7 +22,6 @@ class AiRepositoryImplTest {
     private val repository = AiRepositoryImpl(datasource)
 
     private val request = GuideRequest(
-        placeName = "경복궁",
         region = "서울 종로구",
         language = "English"
     )
@@ -65,7 +64,6 @@ class AiRepositoryImplTest {
         verify(exactly = 1) {
             datasource.generateGuide(
                 match {
-                    it.placeName == "경복궁" &&
                             it.region == "서울 종로구" &&
                             it.language == "English"
                 }

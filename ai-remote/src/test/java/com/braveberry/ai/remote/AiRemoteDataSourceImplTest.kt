@@ -22,7 +22,6 @@ class AiRemoteDataSourceImplTest {
     private val datasource = AiRemoteDataSourceImpl(api)
 
     private val request = GuideRequestDataModel(
-        placeName = "경복궁",
         region = "서울 종로구",
         language = "English"
     )
@@ -62,7 +61,6 @@ class AiRemoteDataSourceImplTest {
         coVerify(exactly = 1) {
             api.generateGuide(
                 match {
-                    it.placeName == "경복궁" &&
                             it.region == "서울 종로구" &&
                             it.language == "English"
                 }

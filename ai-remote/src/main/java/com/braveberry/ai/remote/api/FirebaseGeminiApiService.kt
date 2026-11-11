@@ -19,7 +19,6 @@ class FirebaseGeminiApiService(
         model.generateContentStream(
             templateId = "guide-v1",
             inputs = mapOf(
-                "placeName" to request.placeName,
                 "placeDescription" to request.region,
                 "language" to request.language
             )

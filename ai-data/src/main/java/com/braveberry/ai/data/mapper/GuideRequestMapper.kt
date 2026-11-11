@@ -5,7 +5,6 @@ import com.braveberry.domain.model.ai.GuideRequest
 
 fun GuideRequest.toDataModel(): GuideRequestDataModel {
     return GuideRequestDataModel(
-        placeName = placeName,
         region = region,
         language = language
     )
