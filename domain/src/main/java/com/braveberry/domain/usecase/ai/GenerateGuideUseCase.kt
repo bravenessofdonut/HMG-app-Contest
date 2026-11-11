@@ -15,3 +15,5 @@ class GenerateGuideUseCase @Inject constructor(
         return repository.generateGuide(request)
     }
 }
+
+

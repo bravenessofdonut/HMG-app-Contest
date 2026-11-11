@@ -53,6 +53,7 @@ firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "fir
 firebase-ai = { module = "com.google.firebase:firebase-ai" }
 androidx-junit-ktx = { module = "androidx.test.ext:junit-ktx", version.ref = "androidxJunitKtx" }
 
+firebase-common = { module = "com.google.firebase:firebase-common" }
 pleos-vehicle = { module = "ai.pleos.playground:Vehicle", version.ref = "pleosVehicle" }
 pleos-tts = { module = "ai.pleos.playground:TextToSpeech", version.ref = "pleosSpeech" }
 pleos-stt = { module = "ai.pleos.playground:SpeechToText", version.ref = "pleosSpeech" }
