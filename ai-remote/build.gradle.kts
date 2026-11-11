@@ -1,15 +1,18 @@
 import java.util.Properties
 
 val localProperties = Properties().apply {
-    rootProject.file("local.properties").inputStream().use {
-        load(it)
+    val file = rootProject.file("local.properties")
+
+    if (file.exists()) {
+        file.inputStream().use { load(it) }
     }
 }
 
-fun firebaseProperty(key: String): String {
-    return localProperties.getProperty(key)
-        ?: error("Missing property: $key")
-}
+fun firebaseProperty(key: String): String =
+    localProperties.getProperty(key)
+        ?.takeIf { it.isNotBlank() }
+        ?: System.getenv(key.uppercase().replace('.', '_'))
+        ?: ""
 
 plugins {
     id("braveberry.android.library")

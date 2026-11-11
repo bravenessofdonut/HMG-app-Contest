@@ -4,6 +4,7 @@ package com.braveberry.domain.usecase.ai
 import com.braveberry.data_resource.DataResource
 import com.braveberry.data_resource.ResourceFailure
 import com.braveberry.domain.model.ai.GuideRequest
+import com.braveberry.domain.model.ai.GuideStreamModel
 import com.braveberry.domain.repository.AiRepository
 import io.mockk.every
 import io.mockk.mockk
@@ -22,7 +23,6 @@ class GenerateGuideUseCaseTest {
     private val useCase = GenerateGuideUseCase(repository)
 
     private val request = GuideRequest(
-        placeName = "경복궁",
         region = "서울 종로구",
         language = "English"
     )
@@ -32,7 +32,11 @@ class GenerateGuideUseCaseTest {
         // Given
         every {
             repository.generateGuide(any())
-        } returns flowOf(DataResource.success("Hello"))
+        } returns flowOf(
+            DataResource.success(
+                GuideStreamModel(textChunk = "Hello")
+            )
+        )
 
         // When
         useCase(request).toList()
@@ -41,8 +45,7 @@ class GenerateGuideUseCaseTest {
         verify(exactly = 1) {
             repository.generateGuide(
                 match {
-                    it.placeName == "경복궁" &&
-                            it.region == "서울 종로구" &&
+                    it.region == "서울 종로구" &&
                             it.language == "English"
                 }
             )
@@ -52,22 +55,37 @@ class GenerateGuideUseCaseTest {
     @Test
     fun `Loading과 스트리밍 Success를 그대로 전달한다`() = runTest {
         // Given
-        val loading: DataResource<String> = DataResource.loading()
-        val first: DataResource<String> = DataResource.success("Hello")
-        val second: DataResource<String> = DataResource.success(" everyone!")
+        val loading: DataResource<GuideStreamModel> =
+            DataResource.loading()
+
+        val place: DataResource<GuideStreamModel> =
+            DataResource.success(
+                GuideStreamModel(placeName = "Gyeongbokgung Palace")
+            )
+
+        val first: DataResource<GuideStreamModel> =
+            DataResource.success(
+                GuideStreamModel(textChunk = "Hello")
+            )
+
+        val second: DataResource<GuideStreamModel> =
+            DataResource.success(
+                GuideStreamModel(textChunk = " everyone!")
+            )
 
         every {
             repository.generateGuide(request)
-        } returns flowOf(loading, first, second)
+        } returns flowOf(loading, place, first, second)
 
         // When
         val results = useCase(request).toList()
 
         // Then
-        assertEquals(3, results.size)
+        assertEquals(4, results.size)
         assertSame(loading, results[0])
-        assertSame(first, results[1])
-        assertSame(second, results[2])
+        assertSame(place, results[1])
+        assertSame(first, results[2])
+        assertSame(second, results[3])
     }
 
     @Test
@@ -77,7 +95,8 @@ class GenerateGuideUseCaseTest {
             IOException("Network error")
         )
 
-        val error: DataResource<String> = DataResource.error(failure)
+        val error: DataResource<GuideStreamModel> =
+            DataResource.error(failure)
 
         every {
             repository.generateGuide(request)
