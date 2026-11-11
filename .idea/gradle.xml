@@ -31,6 +31,7 @@
             <option value="$PROJECT_DIR$/vehicle-local" />
             <option value="$PROJECT_DIR$/voice-data" />
             <option value="$PROJECT_DIR$/voice-local" />
+            <option value="$PROJECT_DIR$/voice-remote" />
           </set>
         </option>
       </GradleProjectSettings>

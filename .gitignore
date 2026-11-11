@@ -14,3 +14,7 @@
 .cxx
 local.properties
 build/
+
+# Firebase / Secrets
+google-services.json
+**/google-services.json

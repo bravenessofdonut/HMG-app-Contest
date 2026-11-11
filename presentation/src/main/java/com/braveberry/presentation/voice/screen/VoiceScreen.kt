@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.braveberry.domain.model.voice.EngineStatus
 import com.braveberry.domain.model.voice.PlaybackPhase
+import com.braveberry.domain.model.voice.RemoteTtsOptions
 import com.braveberry.domain.model.voice.VoiceEvent
 import com.braveberry.domain.model.voice.VoiceSessionState
 import java.util.Locale
@@ -31,7 +32,10 @@ import java.util.Locale
 @Composable
 fun VoiceScreen(
     state: VoiceSessionState,
+    geminiOptions: RemoteTtsOptions,
     onSpeak: (String, String) -> Unit,
+    onGeminiSpeak: (text: String, voice: String, language: String) -> Unit,
+    onGeminiStop: () -> Unit,
     onPreviewDialogue: (String, String, String, String) -> Unit,
     onStopSpeaking: () -> Unit,
     onStartListening: () -> Unit,
@@ -40,12 +44,15 @@ fun VoiceScreen(
     onBack: () -> Unit
 ) {
     var text by rememberSaveable { mutableStateOf("안녕하세요. Pleos TTS 음성 테스트입니다.") }
+    var geminiText by rememberSaveable { mutableStateOf("Hello! This is a test for Gemini Remote Text-to-Speech.") }
+    var geminiVoice by rememberSaveable { mutableStateOf(geminiOptions.defaultSpeaker) }
+    var geminiLanguage by rememberSaveable { mutableStateOf(geminiOptions.languages.first()) }
     var aText by rememberSaveable { mutableStateOf("안녕하세요, 오늘은 미래의 자동차에 대해 이야기해 볼게요.") }
     var bText by rememberSaveable { mutableStateOf("좋아요. 자동차가 이동 수단을 넘어 공간이 되고 있다는 점이 흥미롭네요.") }
     var rawMain by rememberSaveable { mutableStateOf("") }
     var rawA by rememberSaveable { mutableStateOf("") }
     var rawB by rememberSaveable { mutableStateOf("") }
-    // 기본 음성은 setSpeakerType()을 호출하지 않음.
+
     val values = state.availableSpeakers
     val mainSpeaker = rawMain.takeIf { it in values }.orEmpty()
     val koreanSpeakers = values.filter { state.speakerLanguageTags[it] == "ko-KR" }
@@ -55,6 +62,7 @@ fun VoiceScreen(
         (state.speakerKind == VoiceEvent.SpeakerKind.MANUAL_STRING ||
             state.speakerKind == VoiceEvent.SpeakerKind.ENUM_VALUES)
     val canPlay = state.canSpeak
+
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -63,8 +71,8 @@ fun VoiceScreen(
             Text("음성 이벤트 연결이 끊겼습니다")
             Button(onClick = onReconnect) { Text("음성 서비스 다시 연결") }
         }
-        Text("Pleos 음성 실험실", style = MaterialTheme.typography.headlineSmall)
-        Text("Pleos Speech Service 3.3.1 · ON_DEVICE · ko-KR")
+        Text("음성 실험실", style = MaterialTheme.typography.headlineSmall)
+        Text("Speech Service · Pleos Local & Gemini Remote")
         Text("TTS: ${state.ttsStatus.label()}" + if (state.speaking) " · 재생 중" else "")
         Text("재생 단계: ${state.playback.phase.label()}")
         when (state.speakerKind) {
@@ -74,21 +82,45 @@ fun VoiceScreen(
             VoiceEvent.SpeakerKind.UNSUPPORTED -> Text("이 환경에서 호출 가능한 화자 변경 시그니처를 찾지 못했음")
         }
         if (choiceAvailable) {
-            SpeakerPicker("단일 TTS 화자", state, mainSpeaker, { rawMain = it }, allowDefault = true)
+            SpeakerPicker("단일 TTS 화자 (Pleos)", state, mainSpeaker, { rawMain = it }, allowDefault = true)
             Text("기본 음성은 화자 설정을 생략함. 변경 후 원래 음색으로 돌아가려면 앱 재시작이 필요할 수 있음")
             Text("최근 화자 변경 요청: ${state.requestedSpeaker ?: "없음"} (실제 음색은 청취 확인 필요)")
         }
         OutlinedTextField(
             modifier = Modifier.fillMaxWidth(), value = text,
-            onValueChange = { text = it }, label = { Text("읽을 문장") }
+            onValueChange = { text = it }, label = { Text("읽을 문장 (Pleos)") }
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = { onSpeak(text, if (choiceAvailable) mainSpeaker else "") },
                 enabled = canPlay && text.isNotBlank()) {
-                Text("TTS 재생")
+                Text("Pleos TTS 재생")
             }
             Button(onClick = onStopSpeaking, enabled = !state.stopping && (state.speaking || state.previewRunning)) { Text("중지") }
         }
+
+        HorizontalDivider()
+        Text("Gemini Remote TTS 음성 테스트", style = MaterialTheme.typography.titleMedium)
+        Text("Firebase AI Logic · gemini-3.1-flash-tts-preview · 24kHz Raw PCM")
+
+        SimplePicker("Gemini 언어 선택", geminiOptions.languages, geminiLanguage) { geminiLanguage = it }
+        SimplePicker("Gemini 화자 선택", geminiOptions.speakers, geminiVoice) { geminiVoice = it }
+
+        OutlinedTextField(
+            modifier = Modifier.fillMaxWidth(),
+            value = geminiText,
+            onValueChange = { geminiText = it },
+            label = { Text("읽을 문장 (Gemini)") }
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = { onGeminiSpeak(geminiText, geminiVoice, geminiLanguage) },
+                enabled = geminiText.isNotBlank()
+            ) {
+                Text("Gemini TTS 재생")
+            }
+            Button(onClick = onGeminiStop) { Text("중지") }
+        }
+
         HorizontalDivider()
         Text("2인 팟캐스트 대화 시연", style = MaterialTheme.typography.titleMedium)
         Text("현재는 준비된 문장 두 개를 순서대로 읽는 테스트임. AI 대본 생성 기능은 포함하지 않음")
@@ -132,6 +164,33 @@ fun VoiceScreen(
 }
 
 @Composable
+private fun SimplePicker(
+    title: String,
+    options: List<String>,
+    selected: String,
+    onSelect: (String) -> Unit
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    Column {
+        Text(title, style = MaterialTheme.typography.labelLarge)
+        Button(onClick = { expanded = true }) {
+            Text(selected)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { name ->
+                DropdownMenuItem(
+                    text = { Text(name) },
+                    onClick = {
+                        onSelect(name)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun SpeakerPicker(
     title: String,
     state: VoiceSessionState,
@@ -141,7 +200,6 @@ private fun SpeakerPicker(
     koreanOnly: Boolean = false
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
-    // 언어 필터는 UI 편의이고, 명령 처리 계층에서도 다시 검증함.
     val allowed = state.availableSpeakers.filter { !koreanOnly || state.speakerLanguageTags[it] == "ko-KR" }
     val groups = if (state.speakerKind == VoiceEvent.SpeakerKind.MANUAL_STRING) {
         allowed.groupBy { state.speakerLanguageTags[it] }.map { (tag, names) ->
