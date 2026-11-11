@@ -1,4 +1,4 @@
-package com.braveberry.voice.data
+package com.braveberry.voice.remote
 
 /**
  * 서비스 시나리오(도착 알림, 안전벨트, 소지품, 가이드 안내)의 실제 언어별 문장.

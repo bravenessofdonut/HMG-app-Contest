@@ -1,37 +1,31 @@
-package com.braveberry.voice.remote.impl
+package com.braveberry.voice.remote.api
 
-import com.braveberry.voice.data.datasource.SpeechSynthesisDataSource
-import com.braveberry.voice.remote.mapper.toSynthesisError
 import com.braveberry.voice.remote.model.GeminiAudioFormat
-import com.braveberry.voice.remote.model.GeminiSpeakerCatalog
+import com.braveberry.voice.remote.model.TtsSpeechRequestDto
 import com.google.firebase.Firebase
 import com.google.firebase.ai.GenerativeModel
 import com.google.firebase.ai.ai
 import com.google.firebase.ai.type.GenerativeBackend
 import com.google.firebase.ai.type.InlineDataPart
+import com.google.firebase.ai.type.PublicPreviewAPI
 import com.google.firebase.ai.type.ResponseModality
 import com.google.firebase.ai.type.SpeechConfig
 import com.google.firebase.ai.type.Voice
 import com.google.firebase.ai.type.generationConfig
-import javax.inject.Inject
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import java.util.concurrent.ConcurrentHashMap
+import javax.inject.Inject
+import javax.inject.Singleton
 
-/** Firebase AI Logic의 Gemini TTS로 문장을 합성하는 DataSource. */
-@Suppress("OPT_IN_USAGE", "OPT_IN_USAGE_ERROR")
-internal class GeminiSpeechSynthesisDataSourceImpl @Inject constructor() : SpeechSynthesisDataSource {
+/** Firebase AI Logic의 Gemini TTS 호출. 화자·언어 조합마다 모델을 한 번만 생성함. */
+@OptIn(PublicPreviewAPI::class)
+@Singleton
+class FirebaseGeminiTtsApiService @Inject constructor() : GeminiTtsApiService {
 
     private companion object {
         const val MODEL_NAME = "gemini-3.1-flash-tts-preview"
     }
-
-    override val voices = GeminiSpeakerCatalog.speakers
-    override val defaultVoice = GeminiSpeakerCatalog.defaultSpeaker
-    override val languages = GeminiSpeakerCatalog.supportedLanguages
-    override val sampleRateHz = GeminiAudioFormat.SAMPLE_RATE
 
     private val models = ConcurrentHashMap<Pair<String, String>, GenerativeModel>()
 
@@ -48,9 +42,11 @@ internal class GeminiSpeechSynthesisDataSourceImpl @Inject constructor() : Speec
                 .generativeModel(modelName = MODEL_NAME, generationConfig = config)
         }
 
-    override fun synthesize(text: String, voice: String, language: String): Flow<ByteArray> = flow {
-        modelFor(voice, language)
-            .generateContentStream(text)
+    override fun generateSpeech(
+        request: TtsSpeechRequestDto
+    ): Flow<ByteArray> = flow {
+        modelFor(request.voice, request.language)
+            .generateContentStream(request.text)
             .collect { response ->
                 response.candidates.firstOrNull()?.content?.parts
                     ?.filterIsInstance<InlineDataPart>()   // 오디오 part를 전부 처리
@@ -58,9 +54,5 @@ internal class GeminiSpeechSynthesisDataSourceImpl @Inject constructor() : Speec
                     ?.filter { GeminiAudioFormat.isPlayableAudio(it.mimeType) }
                     ?.forEach { emit(it.inlineData) }
             }
-    }.catch { cause ->
-        // Firebase 예외 타입이 data로 새지 않도록 계약의 표준 예외로 변환함.
-        if (cause is CancellationException) throw cause
-        throw cause.toSynthesisError()
     }
 }

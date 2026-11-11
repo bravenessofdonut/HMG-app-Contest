@@ -1,8 +1,8 @@
-package com.braveberry.voice.data.util
+package com.braveberry.voice.remote.util
 
-import com.braveberry.voice.data.TtsSampleSentences.Chinese
-import com.braveberry.voice.data.TtsSampleSentences.English
-import com.braveberry.voice.data.TtsSampleSentences.Japanese
+import com.braveberry.voice.remote.TtsSampleSentences.Chinese
+import com.braveberry.voice.remote.TtsSampleSentences.English
+import com.braveberry.voice.remote.TtsSampleSentences.Japanese
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.toList

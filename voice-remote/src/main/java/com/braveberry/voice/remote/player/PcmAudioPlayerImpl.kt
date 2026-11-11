@@ -1,7 +1,6 @@
-package com.braveberry.voice.remote.impl
+package com.braveberry.voice.remote.player
 
 import android.media.AudioAttributes
-import com.braveberry.voice.data.datasource.AudioOutputDataSource
 import android.media.AudioFormat
 import android.media.AudioTrack
 import java.io.IOException
@@ -15,8 +14,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.milliseconds
 
-/** AudioTrack으로 PCM 16-bit mono를 출력하는 DataSource. */
-internal class AudioTrackOutputDataSourceImpl @Inject constructor() : AudioOutputDataSource {
+/** AudioTrack으로 PCM 16-bit mono를 출력함. */
+class PcmAudioPlayerImpl @Inject constructor() : PcmAudioPlayer {
 
     private class Session(val track: AudioTrack, val sampleRateHz: Int) {
         @Volatile var stopped = false
@@ -122,6 +121,4 @@ internal class AudioTrackOutputDataSourceImpl @Inject constructor() : AudioOutpu
         s.stopped = true
         runCatching { s.track.pause(); s.track.flush() }
     }
-
-    override fun release() = stop()
 }

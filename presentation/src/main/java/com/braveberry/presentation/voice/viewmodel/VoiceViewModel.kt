@@ -1,14 +1,17 @@
 package com.braveberry.presentation.voice.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.braveberry.domain.model.voice.RemoteTtsOptions
 import com.braveberry.domain.model.voice.VoiceSessionState
 import com.braveberry.domain.usecase.voice.GetRemoteTtsOptionsUseCase
 import com.braveberry.domain.usecase.voice.SpeakRemoteTtsUseCase
-import com.braveberry.domain.usecase.voice.StopRemoteTtsUseCase
 import com.braveberry.domain.usecase.voice.VoiceSessionOwner
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 import org.orbitmvi.orbit.ContainerHost
 import org.orbitmvi.orbit.syntax.simple.intent
 import org.orbitmvi.orbit.syntax.simple.reduce
@@ -19,10 +22,10 @@ import org.orbitmvi.orbit.viewmodel.container
 class VoiceViewModel @Inject constructor(
     private val owner: VoiceSessionOwner,
     private val speakRemoteTts: SpeakRemoteTtsUseCase,
-    private val stopRemoteTts: StopRemoteTtsUseCase,
     getRemoteTtsOptions: GetRemoteTtsOptionsUseCase
 ) : ViewModel(), ContainerHost<VoiceSessionState, Nothing> {
     private val session = owner.acquire()
+    private var remoteTtsJob: Job? = null
     override val container = container<VoiceSessionState, Nothing>(session.state.value)
 
     /** 변하지 않는 선택지라 Orbit 상태가 아닌 값으로 노출함. */
@@ -34,16 +37,26 @@ class VoiceViewModel @Inject constructor(
 
     fun connect() = session.connect()
     fun speak(text: String, speaker: String) = session.speak(text, speaker)
-    fun speakRemote(text: String, voiceName: String, language: String) =
-        speakRemoteTts(text, voiceName, language)
-    fun stopRemote() = stopRemoteTts()
+    // 재생 상태와 실패(DataResource.Error)는 화면에 표시하지 않음(팀 논의 후 결정). 세부 원인은 로그에 남음.
+    // 수집하는 동안만 재생되며, 화면을 떠나면 viewModelScope 취소로 함께 멈춤.
+    fun speakRemote(text: String, voiceName: String, language: String) {
+        remoteTtsJob?.cancel()
+        remoteTtsJob = viewModelScope.launch {
+            speakRemoteTts(text, voiceName, language).collect()
+        }
+    }
+
+    fun stopRemote() {
+        remoteTtsJob?.cancel()
+        remoteTtsJob = null
+    }
+
     fun previewDialogue(aText: String, bText: String, aSpeaker: String, bSpeaker: String) =
         session.previewDialogue(aText, bText, aSpeaker, bSpeaker)
     fun stopSpeaking() = session.stopSpeaking()
     fun startListening() = session.startListening()
     fun stopListening() = session.stopListening()
 
-    // Remote TTS 해제는 ActivityRetained 수명이 소유함. 화면을 떠나도 진행 중 재생은 유지함.
     override fun onCleared() {
         owner.release()
         super.onCleared()

@@ -12,40 +12,56 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** data는 IOException만 재시도하므로, 회복 가능한 Firebase 실패만 IOException이 돼야 함. */
 class GeminiErrorMapperTest {
 
     @Test
-    fun transientFailuresBecomeIOException() {
+    fun transientFailuresAreRetried() {
         listOf(
             firebaseError<ServerException>(),
+            IOException("reset"),
             // SDK가 연결 오류를 감싸서 던지는 실제 형태.
             firebaseError<UnknownException>(SocketTimeoutException())
-        ).forEach { original ->
-            val mapped = original.toSynthesisError()
-            assertTrue(original.javaClass.simpleName, mapped is IOException)
-            assertSame(original, mapped.cause)   // 원인 보존
-        }
+        ).forEach { assertTrue(it.javaClass.simpleName, it.isRetryableGeminiFailure()) }
     }
 
     @Test
-    fun ioExceptionPassesThrough() {
-        val original = IOException("reset")
-        assertSame(original, original.toSynthesisError())
-    }
-
-    @Test
-    fun permanentFailuresStayNonIOException() {
+    fun permanentFailuresAreNotRetried() {
         listOf(
             firebaseError<InvalidAPIKeyException>(),
             firebaseError<QuotaExceededException>(),
             UnsupportedAudioFormatException("audio/L16;rate=16000"),
             firebaseError<UnknownException>(IllegalStateException()),
             IllegalArgumentException()
+        ).forEach { assertFalse(it.javaClass.simpleName, it.isRetryableGeminiFailure()) }
+    }
+
+    @Test
+    fun authFailureBecomesSecurityException() {
+        val original = firebaseError<InvalidAPIKeyException>()
+        val mapped = original.toTtsDataSourceException()
+
+        assertTrue(mapped is SecurityException)
+        assertSame(original, mapped.cause)   // 원인 보존
+    }
+
+    @Test
+    fun unsupportedFormatBecomesUnsupportedOperationException() {
+        val mapped = UnsupportedAudioFormatException("audio/L16;rate=16000").toTtsDataSourceException()
+
+        assertTrue(mapped is UnsupportedOperationException)
+    }
+
+    @Test
+    fun otherFailuresBecomeIOException() {
+        // Firebase 타입이 data로 새지 않아야 함.
+        listOf(
+            firebaseError<QuotaExceededException>(),
+            firebaseError<ServerException>(),
+            IllegalStateException()
         ).forEach { original ->
-            val mapped = original.toSynthesisError()
-            assertFalse(original.javaClass.simpleName, mapped is IOException)
-            assertSame(original, mapped)
+            val mapped = original.toTtsDataSourceException()
+            assertTrue(original.javaClass.simpleName, mapped is IOException)
+            assertSame(original, mapped.cause)
         }
     }
 }
