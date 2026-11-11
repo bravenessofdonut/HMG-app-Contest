@@ -3,7 +3,7 @@ package com.braveberry.location.local.gateway
 import com.braveberry.location.data.model.LocationReading
 import com.braveberry.location.data.model.ProximityRequest
 
-/** SDK 타입과 테스트 코드 사이의 경계. 인스턴스는 구독마다 생성함. */
+/** SDK 구현과 테스트 대역 사이의 경계임. 구독마다 인스턴스 생성함. */
 internal fun interface FusedLocationGatewayFactory {
     fun create(): FusedLocationGateway
 }

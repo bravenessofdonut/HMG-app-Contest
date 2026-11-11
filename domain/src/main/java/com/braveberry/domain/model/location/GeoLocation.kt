@@ -1,6 +1,6 @@
 package com.braveberry.domain.model.location
 
-/** SDK 타입에 의존하지 않는 위치 스냅샷. 위도/경도는 WGS84 좌표. */
+/** SDK와 분리된 위치 정보임. 위도·경도는 WGS84 좌표계 사용함. */
 data class GeoLocation(
     val latitude: Double,
     val longitude: Double,

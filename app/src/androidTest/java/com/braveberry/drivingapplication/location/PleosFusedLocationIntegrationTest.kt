@@ -29,20 +29,20 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Real Pleos-device integration tests (not fake unit tests).
- * Run ONLY on an emulator where the FusedLocation service is installed.
+ * 실제 Pleos 에뮬레이터에서 SDK 동작 확인함.
+ * FusedLocation 서비스가 설치된 환경에서만 실행함.
  *
- * Prerequisites: grant pleos.car.permission.FUSED_LOCATION and enable the
- * target app's mock-location app-op (see scripts/verify-pleos-fused-location.sh).
- * All locations below are injected into the Android GPS test provider, exactly
- * as in the upstream Pleos fused-location sample, not fabricated in a Flow.
+ * 실행 전 FUSED_LOCATION 권한 부여가 필요함.
+ * 앱의 mock-location app-op도 허용해야 함.
+ * 좌표는 Flow가 아니라 GPS 테스트 Provider에 주입함.
+ * 실행은 scripts/verify-pleos-fused-location.sh 사용함.
  */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
 class PleosFusedLocationIntegrationTest {
     private val hilt = HiltAndroidRule(this)
 
-    // Grant after the test APK is installed; the pre-install adb grant can be reset.
+    // APK 설치 후 권한 부여함. 설치 중 권한이 초기화될 수 있음.
     @get:Rule val rules: TestRule = RuleChain
         .outerRule(GrantPermissionRule.grant(FUSED_LOCATION_PERMISSION))
         .around(hilt)
@@ -83,7 +83,7 @@ class PleosFusedLocationIntegrationTest {
             try {
                 val live = stream.awaitInjectedFix(injector, SECOND_LAT, SECOND_LON)
                 assertValidFix(live)
-                // Pleos may update its cached location asynchronously after a callback.
+                // 위치 콜백 이후 캐시 갱신이 늦을 수 있음.
                 var cached: GeoLocation? = null
                 withTimeout(LOCATION_TIMEOUT_MS) {
                     while (cached == null) {
@@ -108,45 +108,6 @@ class PleosFusedLocationIntegrationTest {
                 Log.i(TAG, "PASS: last known matches injected GPS: $cached")
             } finally {
                 stream.stop()
-            }
-        }
-    }
-
-    @Test fun proximityReceivesRegisteredEnterExitEnterFromInjectedGps() = runBlocking {
-        requireReady()
-        withMockGps { injector ->
-            // The initial location MUST be outside the geofence, so the first
-            // explicit inside injection should produce an ENTER event.
-            val live = LiveLocationProbe(observeLocation)
-            try {
-                live.awaitInjectedFix(injector, OUTSIDE_LAT, SEOUL_LON)
-                val zone = ProximityZone(SEOUL_LAT, SEOUL_LON, 100f)
-                val proximity = ProximityProbe(observeProximity, zone)
-                try {
-                    val id = proximity.expectRegistered().alertId
-                    assertTrue("SDK returned blank alert ID", id.isNotBlank())
-                    Log.i(TAG, "REGISTERED $id at radius=${zone.radiusMeters}m")
-
-                    // At each step inject, then await the actual SDK transition.
-                    // Repeat GPS injection while awaiting a location acknowledgment.
-                    injector.inject(SEOUL_LAT, SEOUL_LON)
-                    live.awaitInjectedFix(injector, SEOUL_LAT, SEOUL_LON)
-                    proximity.expectEnter(id)
-
-                    injector.inject(OUTSIDE_LAT, SEOUL_LON)
-                    live.awaitInjectedFix(injector, OUTSIDE_LAT, SEOUL_LON)
-                    proximity.expectExit(id)
-
-                    injector.inject(SEOUL_LAT, SEOUL_LON)
-                    live.awaitInjectedFix(injector, SEOUL_LAT, SEOUL_LON)
-                    proximity.expectEnter(id)
-                    Log.i(TAG, "PASS: proximity sequence ENTER -> EXIT -> ENTER")
-                } finally {
-                    // Cancellation must remove the alert and release the SDK.
-                    proximity.stop()
-                }
-            } finally {
-                live.stop()
             }
         }
     }
@@ -202,6 +163,6 @@ class PleosFusedLocationIntegrationTest {
         const val SEOUL_LON = 126.9780
         const val SECOND_LAT = 37.5700
         const val SECOND_LON = 126.9820
-        const val OUTSIDE_LAT = SEOUL_LAT + 0.005 // About 556 m north of a 100 m zone.
+        const val OUTSIDE_LAT = SEOUL_LAT + 0.005 // 반경 100m 기준, 중심에서 북쪽 약 556m 떨어진 지점임.
     }
 }

@@ -20,7 +20,7 @@ internal class PleosFusedLocationGatewayFactory @Inject constructor(
     override fun create(): FusedLocationGateway = PleosFusedLocationGateway(context)
 }
 
-/** Pleos 샘플과 동일한 SDK 1.1.3 API 사용. 임의의 reflection 없음. */
+/** Pleos FusedLocation 1.1.3 API 사용함. 리플렉션 사용하지 않음. */
 private class PleosFusedLocationGateway(context: Context) : FusedLocationGateway {
     private val applicationContext = context.applicationContext
     private val sdk = FusedLocation(applicationContext)

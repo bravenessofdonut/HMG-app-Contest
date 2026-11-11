@@ -17,7 +17,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 
-/** 한 구독에 SDK 인스턴스 하나. 구독 종료/실패 시 반드시 해제. */
+/** 구독마다 SDK 인스턴스 하나 사용함. 종료하거나 실패하면 해제함. */
 internal class LocationDataSourceImpl @Inject constructor(
     private val factory: FusedLocationGatewayFactory,
 ) : LocationDataSource {
@@ -53,7 +53,7 @@ internal class LocationDataSourceImpl @Inject constructor(
             initialized.set(true)
             gateway.initialize()
             if (continuous) {
-                registered.set(true) // 부분 등록에 실패해도 해제 시도
+                registered.set(true) // 등록 중 실패해도 해제를 시도하도록 표시함.
                 gateway.startLocationUpdates(callback)
             } else {
                 gateway.requestLastLocation(callback)
@@ -86,7 +86,7 @@ internal class LocationDataSourceImpl @Inject constructor(
                 }
                 registeredId.set(alertId)
                 if (cleaned.get()) {
-                    // 등록 콜백보다 먼저 구독이 취소되는 상황: 지연 등록도 즉시 제거.
+                    // 등록 콜백 전에 취소됐다면 뒤늦게 등록된 알림도 제거함.
                     runCatching { gateway.removeProximity(alertId) }
                 } else {
                     trySend(ProximityReading.Registered(alertId))

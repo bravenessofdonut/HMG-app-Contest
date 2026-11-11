@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Pleos emulator integration tests only. This modifies the app's mock-location app-op.
+# Pleos 에뮬레이터 전용 통합 테스트임. 앱의 Mock Location 허용 설정을 변경함.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -18,7 +18,7 @@ TEST_CLASS="com.braveberry.drivingapplication.location.PleosFusedLocationIntegra
 
 "$ADB" get-state >/dev/null || { echo "Start the Pleos emulator first." >&2; exit 1; }
 
-# installDebug first: pm grant/appops apply to the actual installed target app.
+# 앱 설치 후 권한과 app-op 설정을 적용함.
 ./gradlew :app:installDebug
 
 if ! "$ADB" shell pm grant "$PACKAGE" "$PERMISSION"; then
@@ -26,7 +26,7 @@ if ! "$ADB" shell pm grant "$PACKAGE" "$PERMISSION"; then
   echo "The integration test will fail with a clear message if permission is still denied." >&2
 fi
 
-# The mock-location app-op does not grant the Pleos runtime permission.
+# Mock Location 허용과 Pleos 위치 권한은 별개임.
 echo "Permission before instrumentation (may be reset during APK install):"
 "$ADB" shell dumpsys package "$PACKAGE" | grep -F -B 1 -A 2 "$PERMISSION" || true
 
@@ -34,7 +34,7 @@ echo "Permission before instrumentation (may be reset during APK install):"
 "$ADB" logcat -c 2>/dev/null || true
 
 echo "Running real Pleos FusedLocation integration tests..."
-# Preserve test result, but show the SDK callback and injection logs even on failure.
+# 테스트 실패 시에도 SDK 콜백과 GPS 주입 로그를 출력함.
 status=0
 ./gradlew :app:connectedDebugAndroidTest \
   "-Pandroid.testInstrumentationRunnerArguments.class=$TEST_CLASS" || status=$?

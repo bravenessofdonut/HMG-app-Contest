@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 
-/** Only instrumentation tests own this test provider. Do not use it from production. */
+/** 계측 테스트 전용 GPS Provider임. 실제 앱에서는 사용하지 않음. */
 internal class MockGpsInjector(context: Context) : AutoCloseable {
     private val manager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
     private var installed = false
@@ -36,7 +36,7 @@ internal class MockGpsInjector(context: Context) : AutoCloseable {
     fun install() {
         check(!installed) { "Test GPS provider already installed" }
         try {
-            // Matches the Pleos FusedLocation sample: create a mock GPS provider.
+            // Pleos 예제와 동일하게 GPS 테스트 Provider 등록함.
             manager.addTestProvider(
                 LocationManager.GPS_PROVIDER,
                 false, true, false, false,
@@ -86,7 +86,7 @@ internal class MockGpsInjector(context: Context) : AutoCloseable {
     }
 }
 
-/** Real UseCase flow with an independent, explicit lifetime. Propagates SDK failures. */
+/** 실제 UseCase Flow를 구독함. 수명 주기를 직접 관리하고 SDK 오류를 전달함. */
 internal class LiveLocationProbe(observe: ObserveLocationUseCase) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val updates = Channel<GeoLocation>(Channel.UNLIMITED)
