@@ -30,8 +30,12 @@ dependencies {
     implementation(project(":vehicle-local"))
     implementation(project(":voice-data"))
     implementation(project(":voice-local"))
+    implementation(project(":location-data"))
+    implementation(project(":location-local"))
     implementation(libs.androidx.hilt.navigation.compose)
     androidTestImplementation(project(":domain"))
     androidTestImplementation(libs.hilt.testing)
+    androidTestImplementation("androidx.test:rules:1.7.0")
+    androidTestImplementation(libs.kotlinx.coroutines.core)
     kspAndroidTest(libs.hilt.compiler)
 }
