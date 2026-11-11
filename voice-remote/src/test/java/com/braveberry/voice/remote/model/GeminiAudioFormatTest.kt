@@ -1,4 +1,4 @@
-package com.braveberry.voice.remote.api
+package com.braveberry.voice.remote.model
 
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

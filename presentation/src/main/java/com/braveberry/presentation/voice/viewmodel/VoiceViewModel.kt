@@ -26,7 +26,7 @@ class VoiceViewModel @Inject constructor(
     override val container = container<VoiceSessionState, Nothing>(session.state.value)
 
     /** 변하지 않는 선택지라 Orbit 상태가 아닌 값으로 노출함. */
-    val geminiOptions: RemoteTtsOptions = getRemoteTtsOptions()
+    val remoteTtsOptions: RemoteTtsOptions = getRemoteTtsOptions()
 
     init {
         intent { session.state.collect { snapshot -> reduce { snapshot } } }
@@ -34,9 +34,9 @@ class VoiceViewModel @Inject constructor(
 
     fun connect() = session.connect()
     fun speak(text: String, speaker: String) = session.speak(text, speaker)
-    fun speakGemini(text: String, voiceName: String, language: String) =
+    fun speakRemote(text: String, voiceName: String, language: String) =
         speakRemoteTts(text, voiceName, language)
-    fun stopGemini() = stopRemoteTts()
+    fun stopRemote() = stopRemoteTts()
     fun previewDialogue(aText: String, bText: String, aSpeaker: String, bSpeaker: String) =
         session.previewDialogue(aText, bText, aSpeaker, bSpeaker)
     fun stopSpeaking() = session.stopSpeaking()

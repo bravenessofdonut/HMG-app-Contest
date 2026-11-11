@@ -1,4 +1,4 @@
-package com.braveberry.voice.remote.util
+package com.braveberry.voice.data.util
 
 internal object TtsTextSanitizer {
     private val link = Regex("""\[([^\]]*)]\([^)]*\)""")

@@ -1,7 +1,7 @@
-package com.braveberry.voice.remote.util
+package com.braveberry.voice.data.util
 
-import com.braveberry.voice.remote.TtsSampleSentences.Chinese
-import com.braveberry.voice.remote.TtsSampleSentences.Japanese
+import com.braveberry.voice.data.TtsSampleSentences.Chinese
+import com.braveberry.voice.data.TtsSampleSentences.Japanese
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

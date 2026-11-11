@@ -1,19 +1,13 @@
-package com.braveberry.voice.remote.impl
+package com.braveberry.voice.data.impl
 
 import android.util.Log
 import com.braveberry.domain.model.voice.RemoteTtsOptions
 import com.braveberry.domain.model.voice.VoiceEvent
 import com.braveberry.domain.repository.RemoteTtsRepository
-import com.braveberry.voice.remote.api.EmptyAudioException
-import com.braveberry.voice.remote.api.GeminiTtsClient
-import com.braveberry.voice.remote.api.SynthesisException
-import com.braveberry.voice.remote.api.SynthesisRetryPolicy
-import com.braveberry.voice.remote.api.SynthesisTimeoutException
-import com.braveberry.voice.remote.model.GeminiSpeakerCatalog
-import com.braveberry.voice.remote.player.PcmAudioPlayer
-import com.braveberry.voice.remote.source.RemoteVoiceEventInbox
-import com.braveberry.voice.remote.util.TtsTextSanitizer
-import com.braveberry.voice.remote.util.toSpeechChunks
+import com.braveberry.voice.data.datasource.AudioOutputDataSource
+import com.braveberry.voice.data.datasource.SpeechSynthesisDataSource
+import com.braveberry.voice.data.util.TtsTextSanitizer
+import com.braveberry.voice.data.util.toSpeechChunks
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
@@ -43,24 +37,25 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Gemini Remote TTS를 제공하는 RemoteTtsRepository 구현체.
+ * Remote TTS 재생 세션을 운영하는 RemoteTtsRepository 구현체.
+ * 명령 처리 순서, 문장 분할, 타임아웃, 재시도를 담당하고 합성·출력은 DataSource에 맡김.
  */
 internal class RemoteTtsRepositoryImpl(
-    private val client: GeminiTtsClient,
-    private val player: PcmAudioPlayer,
+    private val synthesizer: SpeechSynthesisDataSource,
+    private val output: AudioOutputDataSource,
     dispatcher: CoroutineDispatcher
 ) : RemoteTtsRepository {
 
     @Inject
-    constructor(client: GeminiTtsClient, player: PcmAudioPlayer) :
-        this(client, player, Dispatchers.Default)
+    constructor(synthesizer: SpeechSynthesisDataSource, output: AudioOutputDataSource) :
+        this(synthesizer, output, Dispatchers.Default)
 
     private companion object {
         const val TAG = "RemoteTtsRepository"
         const val PCM_BUFFER_CHUNKS = 64      // 재생 중 다음 문장을 미리 합성할 수 있는 한도
         const val MAX_SYNTH_RETRY = 1
         const val RETRY_DELAY_MS = 300L
-        // 문장별 Gemini 응답 대기 한도. 첫 오디오 청크까지와 청크 사이 간격에 적용함.
+        // 문장별 응답 대기 한도. 첫 오디오 청크까지와 청크 사이 간격에 적용함.
         // 네트워크 타임아웃 임시 값.
         const val SYNTH_RESPONSE_TIMEOUT_MS = 8_000L
         // 중지 요청 후 재생 코루틴 종료 대기 한도. pause+flush로 정상 해제되면 즉시 끝나는 구간임.
@@ -83,9 +78,9 @@ internal class RemoteTtsRepositoryImpl(
     override val events: Flow<VoiceEvent> = inbox.events
 
     override val options = RemoteTtsOptions(
-        speakers = GeminiSpeakerCatalog.speakers,
-        defaultSpeaker = GeminiSpeakerCatalog.defaultSpeaker,
-        languages = GeminiSpeakerCatalog.supportedLanguages
+        speakers = synthesizer.voices,
+        defaultSpeaker = synthesizer.defaultVoice,
+        languages = synthesizer.languages
     )
 
     init {
@@ -125,8 +120,8 @@ internal class RemoteTtsRepositoryImpl(
             withContext(NonCancellable) {
                 runCatching { stopPlayback() }
                     .onFailure { Log.w(TAG, "stopPlayback failed on release", it) }
-                runCatching { player.release() }
-                    .onFailure { Log.w(TAG, "player.release failed", it) }
+                runCatching { output.release() }
+                    .onFailure { Log.w(TAG, "output.release failed", it) }
                 inbox.close()
                 scope.cancel()
             }
@@ -135,26 +130,26 @@ internal class RemoteTtsRepositoryImpl(
 
     /**
      * 중지 과정의 실패가 다음 명령을 막지 않도록 함.
-     * player.stop() 예외는 로그만 남기고, join은 제한시간 후 진행함.
+     * output.stop() 예외는 로그만 남기고, join은 제한시간 후 진행함.
      */
     private suspend fun stopPlayback() {
         val job = playback ?: return
         playback = null
         val wasActive = job.isActive
         job.cancel()
-        stopPlayerSafely()          // 블로킹 write를 먼저 깨워 취소 반응을 빠르게 함
-        // AudioTrack.write는 취소에 반응하지 않으므로, 깨어나지 않으면 루프 전체가 멈출 수 있음.
+        stopOutputSafely()          // 블로킹 출력을 먼저 깨워 취소 반응을 빠르게 함
+        // 블로킹 출력은 취소에 반응하지 않을 수 있으므로, 깨어나지 않으면 루프 전체가 멈출 수 있음.
         val joined = withTimeoutOrNull(STOP_JOIN_TIMEOUT_MS.milliseconds) { job.join() } != null
         if (!joined) Log.w(TAG, "Playback did not stop within ${STOP_JOIN_TIMEOUT_MS}ms; continuing")
-        stopPlayerSafely()          // 안전망: join 사이에 세션이 생겼어도 정리
+        stopOutputSafely()          // 안전망: join 사이에 세션이 생겼어도 정리
         if (wasActive) inbox.offer(VoiceEvent.SpeechStopped)
     }
 
-    private fun stopPlayerSafely() {
+    private fun stopOutputSafely() {
         try {
-            player.stop()
+            output.stop()
         } catch (e: Exception) {
-            Log.w(TAG, "player.stop failed; continuing", e)
+            Log.w(TAG, "output.stop failed; continuing", e)
         }
     }
 
@@ -169,7 +164,7 @@ internal class RemoteTtsRepositoryImpl(
                 .filter { it.isNotBlank() }
                 .flatMapConcat { synthesize(it, cmd.voice, cmd.language) }   // 순서 보장
                 .buffer(PCM_BUFFER_CHUNKS)        // 재생 중 다음 문장 선합성 + 백프레셔
-            player.playStream(pcm)
+            output.play(pcm, synthesizer.sampleRateHz)
             inbox.offer(VoiceEvent.SpeechDone)
         } catch (e: CancellationException) {
             throw e
@@ -185,7 +180,7 @@ internal class RemoteTtsRepositoryImpl(
         while (true) {
             try {
                 try {
-                    client.generateSpeechStream(sentence, voice, language)
+                    synthesizer.synthesize(sentence, voice, language)
                         .timeout(SYNTH_RESPONSE_TIMEOUT_MS.milliseconds)
                         .collect {
                             if (it.isEmpty()) return@collect   // 0바이트 청크는 오디오로 치지 않음
@@ -202,7 +197,7 @@ internal class RemoteTtsRepositoryImpl(
                 throw e
             } catch (e: Exception) {
                 // 이미 재생된 오디오가 있으면 같은 문장이 두 번 읽히므로 재시도하지 않음.
-                if (emitted || !SynthesisRetryPolicy.isRetryable(e) || attempt >= MAX_SYNTH_RETRY) {
+                if (emitted || !e.isRetryableSynthesisFailure() || attempt >= MAX_SYNTH_RETRY) {
                     throw SynthesisException(e)
                 }
                 attempt++
@@ -236,12 +231,11 @@ internal class RemoteTtsRepositoryImpl(
             return
         }
         // 텍스트와 다른 언어로 합성되지 않도록 대체 언어 없이 실패시킴.
-        if (!GeminiSpeakerCatalog.isSupportedLanguage(language)) {
+        if (language !in options.languages) {
             inbox.offer(VoiceEvent.Failed(VoiceEvent.Engine.TTS, "UNSUPPORTED_LANGUAGE: $language"))
             return
         }
-        val voice = voiceName.takeIf { GeminiSpeakerCatalog.isSupported(it) }
-            ?: GeminiSpeakerCatalog.defaultSpeaker
+        val voice = voiceName.takeIf { it in options.speakers } ?: options.defaultSpeaker
         commands.trySend(Command.Speak(tokens, voice, language))
     }
 }

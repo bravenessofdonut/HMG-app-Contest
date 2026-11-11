@@ -1,4 +1,4 @@
-package com.braveberry.voice.remote.source
+package com.braveberry.voice.data.impl
 
 import android.util.Log
 import com.braveberry.domain.model.voice.VoiceEvent

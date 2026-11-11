@@ -1,15 +1,10 @@
-package com.braveberry.voice.remote
+package com.braveberry.voice.data.impl
 
 import com.braveberry.domain.model.voice.VoiceEvent
-import com.braveberry.voice.remote.api.GeminiTtsClient
-import com.braveberry.voice.remote.impl.RemoteTtsRepositoryImpl
-import com.braveberry.voice.remote.model.GeminiSpeakerCatalog
-import com.braveberry.voice.remote.player.PcmAudioPlayer
-import com.google.firebase.ai.type.InvalidAPIKeyException
-import com.google.firebase.ai.type.UnknownException
-import com.braveberry.voice.remote.api.firebaseError
+import com.braveberry.voice.data.TtsSampleSentences
+import com.braveberry.voice.data.datasource.AudioOutputDataSource
+import com.braveberry.voice.data.datasource.SpeechSynthesisDataSource
 import java.io.IOException
-import java.net.UnknownHostException
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -39,10 +34,16 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
+/** SDK 없이 DataSource 계약만으로 재생 규칙을 검증함. 합성 SDK를 바꿔도 이 테스트는 그대로 유지돼야 함. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RemoteTtsRepositoryImplTest {
-    private val client = mockk<GeminiTtsClient>(relaxed = true)
-    private val player = mockk<PcmAudioPlayer>(relaxed = true)
+    private val synthesizer = mockk<SpeechSynthesisDataSource>(relaxed = true) {
+        every { voices } returns listOf("Fenrir", "Kore")
+        every { defaultVoice } returns "Fenrir"
+        every { languages } returns listOf("en-US", "ja-JP", "cmn-CN")
+        every { sampleRateHz } returns 24_000
+    }
+    private val output = mockk<AudioOutputDataSource>(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
 
     private lateinit var repository: RemoteTtsRepositoryImpl
@@ -55,7 +56,7 @@ class RemoteTtsRepositoryImplTest {
         every { android.util.Log.e(any(), any<String>(), any()) } returns 0
         every { android.util.Log.e(any(), any<String>()) } returns 0
         Dispatchers.setMain(testDispatcher)
-        repository = RemoteTtsRepositoryImpl(client, player, testDispatcher)
+        repository = RemoteTtsRepositoryImpl(synthesizer, output, testDispatcher)
     }
 
     @After
@@ -64,15 +65,15 @@ class RemoteTtsRepositoryImplTest {
     }
 
     @Test
-    fun options_comeFromCatalog() {
-        assertEquals(GeminiSpeakerCatalog.speakers, repository.options.speakers)
-        assertEquals(GeminiSpeakerCatalog.defaultSpeaker, repository.options.defaultSpeaker)
-        assertEquals(GeminiSpeakerCatalog.supportedLanguages, repository.options.languages)
+    fun options_comeFromDataSource() {
+        assertEquals(listOf("Fenrir", "Kore"), repository.options.speakers)
+        assertEquals("Fenrir", repository.options.defaultSpeaker)
+        assertEquals(listOf("en-US", "ja-JP", "cmn-CN"), repository.options.languages)
     }
 
     @Test
-    fun speak_whenReady_callsClientAndPlayer() = runTest {
-        coEvery { client.generateSpeechStream("Hello", "Fenrir", "en-US") } returns flowOf(byteArrayOf(1, 2, 3))
+    fun speak_whenReady_callsSynthesizerAndOutput() = runTest {
+        coEvery { synthesizer.synthesize("Hello", "Fenrir", "en-US") } returns flowOf(byteArrayOf(1, 2, 3))
 
         val collectedEvents = mutableListOf<VoiceEvent>()
         val job = launch(UnconfinedTestDispatcher(testScheduler)) {
@@ -84,40 +85,51 @@ class RemoteTtsRepositoryImplTest {
 
         assertTrue(collectedEvents.contains(VoiceEvent.Speaking))
         assertTrue(collectedEvents.contains(VoiceEvent.SpeechDone))
-        coVerify { player.playStream(any()) }
+        coVerify { output.play(any(), 24_000) }
         job.cancel()
     }
 
     @Test
-    fun speak_passesSelectedLanguageToClient() = runTest {
-        coEvery { client.generateSpeechStream(any(), any(), any()) } returns flowOf(byteArrayOf(1, 2))
-        // relaxed player는 PCM Flow를 수집하지 않으므로 실제 합성이 일어나도록 직접 수집함.
-        coEvery { player.playStream(any()) } coAnswers { firstArg<Flow<ByteArray>>().collect() }
+    fun speak_passesSelectedLanguageToSynthesizer() = runTest {
+        coEvery { synthesizer.synthesize(any(), any(), any()) } returns flowOf(byteArrayOf(1, 2))
+        // relaxed output은 PCM Flow를 수집하지 않으므로 실제 합성이 일어나도록 직접 수집함.
+        coEvery { output.play(any(), any()) } coAnswers { firstArg<Flow<ByteArray>>().collect() }
 
         repository.speak("こんにちは、テストです。", "Kore", "ja-JP")
         testScheduler.advanceUntilIdle()
 
-        coVerify(exactly = 1) { client.generateSpeechStream(any(), "Kore", "ja-JP") }
+        coVerify(exactly = 1) { synthesizer.synthesize(any(), "Kore", "ja-JP") }
+    }
+
+    @Test
+    fun speak_withUnknownVoice_fallsBackToDefaultVoice() = runTest {
+        coEvery { synthesizer.synthesize(any(), any(), any()) } returns flowOf(byteArrayOf(1, 2))
+        coEvery { output.play(any(), any()) } coAnswers { firstArg<Flow<ByteArray>>().collect() }
+
+        repository.speak("Hello there.", "seoyoon", "en-US")
+        testScheduler.advanceUntilIdle()
+
+        coVerify(exactly = 1) { synthesizer.synthesize(any(), "Fenrir", "en-US") }
     }
 
     @Test
     fun speak_sendsNativeSentenceWithMatchingLanguage() = runTest {
-        coEvery { client.generateSpeechStream(any(), any(), any()) } returns flowOf(byteArrayOf(1, 2))
-        coEvery { player.playStream(any()) } coAnswers { firstArg<Flow<ByteArray>>().collect() }
+        coEvery { synthesizer.synthesize(any(), any(), any()) } returns flowOf(byteArrayOf(1, 2))
+        coEvery { output.play(any(), any()) } coAnswers { firstArg<Flow<ByteArray>>().collect() }
 
         listOf(
             TtsSampleSentences.Japanese.ARRIVAL to TtsSampleSentences.Japanese.LANGUAGE,
             TtsSampleSentences.Chinese.ARRIVAL to TtsSampleSentences.Chinese.LANGUAGE
         ).forEach { (sentence, language) ->
             val sent = mutableListOf<String>()
-            coEvery { client.generateSpeechStream(capture(sent), any(), any()) } returns flowOf(byteArrayOf(1, 2))
+            coEvery { synthesizer.synthesize(capture(sent), any(), any()) } returns flowOf(byteArrayOf(1, 2))
 
             repository.speak(sentence, "Kore", language)
             testScheduler.advanceUntilIdle()
 
-            // Gemini는 텍스트로 언어를 판단하므로, 문장 단위로 나뉘어도 원문 그대로 같은 언어 코드와 함께 전달돼야 함.
+            // 문장 단위로 나뉘어도 원문 그대로 같은 언어 코드와 함께 전달돼야 함.
             assertEquals(sentence, sent.joinToString(""))
-            coVerify(atLeast = 1) { client.generateSpeechStream(any(), "Kore", language) }
+            coVerify(atLeast = 1) { synthesizer.synthesize(any(), "Kore", language) }
         }
     }
 
@@ -134,15 +146,15 @@ class RemoteTtsRepositoryImplTest {
         assertTrue(collectedEvents.contains(
             VoiceEvent.Failed(VoiceEvent.Engine.TTS, "UNSUPPORTED_LANGUAGE: ko-KR")
         ))
-        coVerify(exactly = 0) { player.playStream(any()) }
-        coVerify(exactly = 0) { client.generateSpeechStream(any(), any(), any()) }
+        coVerify(exactly = 0) { output.play(any(), any()) }
+        coVerify(exactly = 0) { synthesizer.synthesize(any(), any(), any()) }
         job.cancel()
     }
 
     @Test
     fun noResponse_timesOutAfterOneRetryAndReportsFailure() = runTest {
-        coEvery { client.generateSpeechStream(any(), any(), any()) } returns flow { awaitCancellation() }
-        coEvery { player.playStream(any()) } coAnswers { firstArg<Flow<ByteArray>>().collect() }
+        coEvery { synthesizer.synthesize(any(), any(), any()) } returns flow { awaitCancellation() }
+        coEvery { output.play(any(), any()) } coAnswers { firstArg<Flow<ByteArray>>().collect() }
         val collectedEvents = mutableListOf<VoiceEvent>()
         val job = launch(UnconfinedTestDispatcher(testScheduler)) {
             repository.events.toList(collectedEvents)
@@ -152,7 +164,7 @@ class RemoteTtsRepositoryImplTest {
         testScheduler.advanceUntilIdle()
 
         // 오디오를 하나도 받지 못했으므로 1회 재시도 후 실패함.
-        coVerify(exactly = 2) { client.generateSpeechStream(any(), any(), any()) }
+        coVerify(exactly = 2) { synthesizer.synthesize(any(), any(), any()) }
         assertTrue(collectedEvents.contains(
             VoiceEvent.Failed(VoiceEvent.Engine.TTS, "SYNTHESIS_FAILED")
         ))
@@ -162,11 +174,11 @@ class RemoteTtsRepositoryImplTest {
 
     @Test
     fun stallAfterFirstChunk_failsWithoutRetry() = runTest {
-        coEvery { client.generateSpeechStream(any(), any(), any()) } returns flow {
+        coEvery { synthesizer.synthesize(any(), any(), any()) } returns flow {
             emit(byteArrayOf(1, 2))
             awaitCancellation()
         }
-        coEvery { player.playStream(any()) } coAnswers { firstArg<Flow<ByteArray>>().collect() }
+        coEvery { output.play(any(), any()) } coAnswers { firstArg<Flow<ByteArray>>().collect() }
         val collectedEvents = mutableListOf<VoiceEvent>()
         val job = launch(UnconfinedTestDispatcher(testScheduler)) {
             repository.events.toList(collectedEvents)
@@ -176,7 +188,7 @@ class RemoteTtsRepositoryImplTest {
         testScheduler.advanceUntilIdle()
 
         // 이미 재생된 오디오가 있으므로 같은 문장을 다시 읽지 않음.
-        coVerify(exactly = 1) { client.generateSpeechStream(any(), any(), any()) }
+        coVerify(exactly = 1) { synthesizer.synthesize(any(), any(), any()) }
         assertTrue(collectedEvents.contains(
             VoiceEvent.Failed(VoiceEvent.Engine.TTS, "SYNTHESIS_FAILED")
         ))
@@ -185,11 +197,11 @@ class RemoteTtsRepositoryImplTest {
 
     @Test
     fun slowResponseWithinLimit_completesNormally() = runTest {
-        coEvery { client.generateSpeechStream(any(), any(), any()) } returns flow {
+        coEvery { synthesizer.synthesize(any(), any(), any()) } returns flow {
             delay(7_000)
             emit(byteArrayOf(1, 2))
         }
-        coEvery { player.playStream(any()) } coAnswers { firstArg<Flow<ByteArray>>().collect() }
+        coEvery { output.play(any(), any()) } coAnswers { firstArg<Flow<ByteArray>>().collect() }
         val collectedEvents = mutableListOf<VoiceEvent>()
         val job = launch(UnconfinedTestDispatcher(testScheduler)) {
             repository.events.toList(collectedEvents)
@@ -204,33 +216,34 @@ class RemoteTtsRepositoryImplTest {
     }
 
     @Test
-    fun authFailure_isNotRetried() = runTest {
-        coEvery { client.generateSpeechStream(any(), any(), any()) } returns flow {
-            throw firebaseError<InvalidAPIKeyException>()
+    fun nonTransientFailure_isNotRetried() = runTest {
+        // 계약상 IOException이 아닌 실패는 다시 요청해도 회복되지 않음 (인증, 할당량 등).
+        coEvery { synthesizer.synthesize(any(), any(), any()) } returns flow {
+            throw IllegalStateException("auth")
         }
         val events = speakAndCollect()
 
-        coVerify(exactly = 1) { client.generateSpeechStream(any(), any(), any()) }
+        coVerify(exactly = 1) { synthesizer.synthesize(any(), any(), any()) }
         assertTrue(events.contains(VoiceEvent.Failed(VoiceEvent.Engine.TTS, "SYNTHESIS_FAILED")))
     }
 
     @Test
-    fun networkFailure_isRetriedOnceThenReported() = runTest {
-        coEvery { client.generateSpeechStream(any(), any(), any()) } returns flow {
-            throw firebaseError<UnknownException>(UnknownHostException("firebasevertexai.googleapis.com"))
+    fun transientFailure_isRetriedOnceThenReported() = runTest {
+        coEvery { synthesizer.synthesize(any(), any(), any()) } returns flow {
+            throw IOException("network")
         }
         val events = speakAndCollect()
 
-        coVerify(exactly = 2) { client.generateSpeechStream(any(), any(), any()) }
+        coVerify(exactly = 2) { synthesizer.synthesize(any(), any(), any()) }
         assertTrue(events.contains(VoiceEvent.Failed(VoiceEvent.Engine.TTS, "SYNTHESIS_FAILED")))
     }
 
     @Test
-    fun networkFailure_recoversOnRetry() = runTest {
+    fun transientFailure_recoversOnRetry() = runTest {
         var calls = 0
-        coEvery { client.generateSpeechStream(any(), any(), any()) } answers {
+        coEvery { synthesizer.synthesize(any(), any(), any()) } answers {
             calls++
-            if (calls == 1) flow { throw firebaseError<UnknownException>(IOException("reset")) }
+            if (calls == 1) flow { throw IOException("reset") }
             else flowOf(byteArrayOf(1, 2))
         }
         val events = speakAndCollect()
@@ -242,10 +255,10 @@ class RemoteTtsRepositoryImplTest {
     @Test
     fun emptyAudio_isRetriedOnceThenReported() = runTest {
         // 응답은 정상 종료했지만 0바이트 청크만 옴.
-        coEvery { client.generateSpeechStream(any(), any(), any()) } returns flowOf(ByteArray(0))
+        coEvery { synthesizer.synthesize(any(), any(), any()) } returns flowOf(ByteArray(0))
         val events = speakAndCollect()
 
-        coVerify(exactly = 2) { client.generateSpeechStream(any(), any(), any()) }
+        coVerify(exactly = 2) { synthesizer.synthesize(any(), any(), any()) }
         assertTrue(events.contains(VoiceEvent.Failed(VoiceEvent.Engine.TTS, "SYNTHESIS_FAILED")))
         assertFalse(events.contains(VoiceEvent.SpeechDone))
     }
@@ -253,7 +266,7 @@ class RemoteTtsRepositoryImplTest {
     @Test
     fun emptyAudio_recoversOnRetry() = runTest {
         var calls = 0
-        coEvery { client.generateSpeechStream(any(), any(), any()) } answers {
+        coEvery { synthesizer.synthesize(any(), any(), any()) } answers {
             calls++
             if (calls == 1) flowOf() else flowOf(byteArrayOf(1, 2))
         }
@@ -263,9 +276,9 @@ class RemoteTtsRepositoryImplTest {
         assertFalse(events.any { it is VoiceEvent.Failed })
     }
 
-    /** player가 PCM을 실제로 수집하게 한 뒤 한 문장을 재생하고 발생한 이벤트를 반환함. */
+    /** output이 PCM을 실제로 수집하게 한 뒤 한 문장을 재생하고 발생한 이벤트를 반환함. */
     private suspend fun kotlinx.coroutines.test.TestScope.speakAndCollect(): List<VoiceEvent> {
-        coEvery { player.playStream(any()) } coAnswers { firstArg<Flow<ByteArray>>().collect() }
+        coEvery { output.play(any(), any()) } coAnswers { firstArg<Flow<ByteArray>>().collect() }
         val collectedEvents = mutableListOf<VoiceEvent>()
         val job = launch(UnconfinedTestDispatcher(testScheduler)) {
             repository.events.toList(collectedEvents)
@@ -278,10 +291,10 @@ class RemoteTtsRepositoryImplTest {
 
     @Test
     fun stopThrowsException_runLoopSurvivesAndProcessesNextSpeak() = runTest {
-        every { player.stop() } throws RuntimeException("AudioTrack stop failure")
+        every { output.stop() } throws RuntimeException("AudioTrack stop failure")
         var plays = 0
         // 첫 재생은 끝나지 않고 진행 중이어야 두 번째 speak가 stopPlayback()을 거침.
-        coEvery { player.playStream(any()) } coAnswers { if (++plays == 1) awaitCancellation() }
+        coEvery { output.play(any(), any()) } coAnswers { if (++plays == 1) awaitCancellation() }
 
         val collectedEvents = mutableListOf<VoiceEvent>()
         val job = launch(UnconfinedTestDispatcher(testScheduler)) {
@@ -290,12 +303,12 @@ class RemoteTtsRepositoryImplTest {
 
         repository.speak("First", "Fenrir", "en-US")
         testScheduler.advanceUntilIdle()
-        // 진행 중인 First를 끊는 과정에서 player.stop()이 예외를 던짐.
+        // 진행 중인 First를 끊는 과정에서 output.stop()이 예외를 던짐.
         repository.speak("Second", "Fenrir", "en-US")
         testScheduler.advanceUntilIdle()
 
-        coVerify(atLeast = 1) { player.stop() }
-        coVerify(exactly = 2) { player.playStream(any()) }        // Second가 버려지지 않음
+        coVerify(atLeast = 1) { output.stop() }
+        coVerify(exactly = 2) { output.play(any(), any()) }        // Second가 버려지지 않음
         assertEquals(2, collectedEvents.count { it == VoiceEvent.Speaking })
         assertTrue(collectedEvents.contains(VoiceEvent.SpeechStopped))
         assertTrue(collectedEvents.contains(VoiceEvent.SpeechDone))
@@ -307,7 +320,7 @@ class RemoteTtsRepositoryImplTest {
     fun stuckPlayback_doesNotBlockNextSpeakBeyondJoinTimeout() = runTest {
         var plays = 0
         // 블로킹 write처럼 취소에 반응하지 않는 재생을 흉내 냄.
-        coEvery { player.playStream(any()) } coAnswers {
+        coEvery { output.play(any(), any()) } coAnswers {
             if (++plays == 1) withContext(NonCancellable) { delay(60_000) }
         }
         val collectedEvents = mutableListOf<VoiceEvent>()
@@ -322,7 +335,7 @@ class RemoteTtsRepositoryImplTest {
         testScheduler.runCurrent()
 
         // First가 아직 끝나지 않았지만 1초 제한 후 Second가 시작됨.
-        coVerify(exactly = 2) { player.playStream(any()) }
+        coVerify(exactly = 2) { output.play(any(), any()) }
         assertTrue(collectedEvents.contains(VoiceEvent.SpeechStopped))
         job.cancel()
     }

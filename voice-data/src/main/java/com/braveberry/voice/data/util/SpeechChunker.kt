@@ -1,4 +1,4 @@
-package com.braveberry.voice.remote.util
+package com.braveberry.voice.data.util
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow

@@ -1,6 +1,5 @@
-package com.braveberry.voice.remote
+package com.braveberry.voice.remote.model
 
-import com.braveberry.voice.remote.model.GeminiSpeakerCatalog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

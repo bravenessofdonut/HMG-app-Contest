@@ -1,8 +1,8 @@
-package com.braveberry.voice.remote
+package com.braveberry.voice.data
 
 /**
  * 서비스 시나리오(도착 알림, 안전벨트, 소지품, 가이드 안내)의 실제 언어별 문장.
- * Gemini는 텍스트로 언어를 판단하므로 languageCode와 같은 언어의 문장을 사용해야 함.
+ * 합성 엔진은 텍스트로 언어를 판단하므로 languageCode와 같은 언어의 문장을 사용해야 함.
  * 일본어·중국어는 전각 문장부호(。！？、，)를 그대로 유지함.
  */
 internal object TtsSampleSentences {

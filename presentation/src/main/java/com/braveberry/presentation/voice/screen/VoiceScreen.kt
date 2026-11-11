@@ -32,10 +32,10 @@ import java.util.Locale
 @Composable
 fun VoiceScreen(
     state: VoiceSessionState,
-    geminiOptions: RemoteTtsOptions,
+    remoteTtsOptions: RemoteTtsOptions,
     onSpeak: (String, String) -> Unit,
-    onGeminiSpeak: (text: String, voice: String, language: String) -> Unit,
-    onGeminiStop: () -> Unit,
+    onRemoteSpeak: (text: String, voice: String, language: String) -> Unit,
+    onRemoteStop: () -> Unit,
     onPreviewDialogue: (String, String, String, String) -> Unit,
     onStopSpeaking: () -> Unit,
     onStartListening: () -> Unit,
@@ -44,9 +44,9 @@ fun VoiceScreen(
     onBack: () -> Unit
 ) {
     var text by rememberSaveable { mutableStateOf("안녕하세요. Pleos TTS 음성 테스트입니다.") }
-    var geminiText by rememberSaveable { mutableStateOf("Hello! This is a test for Gemini Remote Text-to-Speech.") }
-    var geminiVoice by rememberSaveable { mutableStateOf(geminiOptions.defaultSpeaker) }
-    var geminiLanguage by rememberSaveable { mutableStateOf(geminiOptions.languages.first()) }
+    var remoteText by rememberSaveable { mutableStateOf("Hello! This is a test for Gemini Remote Text-to-Speech.") }
+    var remoteVoice by rememberSaveable { mutableStateOf(remoteTtsOptions.defaultSpeaker) }
+    var remoteLanguage by rememberSaveable { mutableStateOf(remoteTtsOptions.languages.first()) }
     var aText by rememberSaveable { mutableStateOf("안녕하세요, 오늘은 미래의 자동차에 대해 이야기해 볼게요.") }
     var bText by rememberSaveable { mutableStateOf("좋아요. 자동차가 이동 수단을 넘어 공간이 되고 있다는 점이 흥미롭네요.") }
     var rawMain by rememberSaveable { mutableStateOf("") }
@@ -102,23 +102,23 @@ fun VoiceScreen(
         Text("Gemini Remote TTS 음성 테스트", style = MaterialTheme.typography.titleMedium)
         Text("Firebase AI Logic · gemini-3.1-flash-tts-preview · 24kHz Raw PCM")
 
-        SimplePicker("Gemini 언어 선택", geminiOptions.languages, geminiLanguage) { geminiLanguage = it }
-        SimplePicker("Gemini 화자 선택", geminiOptions.speakers, geminiVoice) { geminiVoice = it }
+        SimplePicker("Gemini 언어 선택", remoteTtsOptions.languages, remoteLanguage) { remoteLanguage = it }
+        SimplePicker("Gemini 화자 선택", remoteTtsOptions.speakers, remoteVoice) { remoteVoice = it }
 
         OutlinedTextField(
             modifier = Modifier.fillMaxWidth(),
-            value = geminiText,
-            onValueChange = { geminiText = it },
+            value = remoteText,
+            onValueChange = { remoteText = it },
             label = { Text("읽을 문장 (Gemini)") }
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
-                onClick = { onGeminiSpeak(geminiText, geminiVoice, geminiLanguage) },
-                enabled = geminiText.isNotBlank()
+                onClick = { onRemoteSpeak(remoteText, remoteVoice, remoteLanguage) },
+                enabled = remoteText.isNotBlank()
             ) {
                 Text("Gemini TTS 재생")
             }
-            Button(onClick = onGeminiStop) { Text("중지") }
+            Button(onClick = onRemoteStop) { Text("중지") }
         }
 
         HorizontalDivider()

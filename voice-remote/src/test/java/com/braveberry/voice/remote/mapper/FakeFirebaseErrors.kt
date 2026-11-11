@@ -1,4 +1,4 @@
-package com.braveberry.voice.remote.api
+package com.braveberry.voice.remote.mapper
 
 /**
  * Firebase AI 예외의 (message, cause) 생성자는 Kotlin internal이라 테스트 코드에서 직접 호출할 수 없음.

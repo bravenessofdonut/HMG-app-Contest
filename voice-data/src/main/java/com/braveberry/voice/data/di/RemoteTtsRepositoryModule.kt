@@ -1,12 +1,7 @@
-package com.braveberry.voice.remote.di
+package com.braveberry.voice.data.di
 
 import com.braveberry.domain.repository.RemoteTtsRepository
-import com.braveberry.voice.remote.api.GeminiTtsClient
-import com.braveberry.voice.remote.api.GeminiTtsClientImpl
-import com.braveberry.voice.remote.impl.RemoteTtsRepositoryImpl
-import com.braveberry.voice.remote.player.AudioTrackPcmPlayer
-import com.braveberry.voice.remote.player.PcmAudioPlayer
-import dagger.Binds
+import com.braveberry.voice.data.impl.RemoteTtsRepositoryImpl
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -16,22 +11,7 @@ import dagger.hilt.android.scopes.ActivityRetainedScoped
 
 @Module
 @InstallIn(ActivityRetainedComponent::class)
-internal abstract class VoiceRemoteModule {
-
-    @Binds
-    abstract fun bindGeminiTtsClient(
-        impl: GeminiTtsClientImpl
-    ): GeminiTtsClient
-
-    @Binds
-    abstract fun bindPcmAudioPlayer(
-        impl: AudioTrackPcmPlayer
-    ): PcmAudioPlayer
-}
-
-@Module
-@InstallIn(ActivityRetainedComponent::class)
-internal object RemoteTtsRuntimeModule {
+internal object RemoteTtsRepositoryModule {
 
     /**
      * 인스턴스와 해제 시점을 같은 ActivityRetained 수명에 묶음.

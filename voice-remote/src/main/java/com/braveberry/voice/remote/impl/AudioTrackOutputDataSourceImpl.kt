@@ -1,6 +1,7 @@
-package com.braveberry.voice.remote.player
+package com.braveberry.voice.remote.impl
 
 import android.media.AudioAttributes
+import com.braveberry.voice.data.datasource.AudioOutputDataSource
 import android.media.AudioFormat
 import android.media.AudioTrack
 import java.io.IOException
@@ -14,16 +15,16 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.milliseconds
 
-internal class AudioTrackPcmPlayer @Inject constructor() : PcmAudioPlayer {
+/** AudioTrack으로 PCM 16-bit mono를 출력하는 DataSource. */
+internal class AudioTrackOutputDataSourceImpl @Inject constructor() : AudioOutputDataSource {
 
-    private class Session(val track: AudioTrack) {
+    private class Session(val track: AudioTrack, val sampleRateHz: Int) {
         @Volatile var stopped = false
     }
 
     @Volatile private var current: Session? = null
 
     private companion object {
-        const val SAMPLE_RATE = 24000
         const val CHANNEL_CONFIG = AudioFormat.CHANNEL_OUT_MONO
         const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
         const val BYTES_PER_FRAME = 2                 // 16bit mono
@@ -31,10 +32,10 @@ internal class AudioTrackPcmPlayer @Inject constructor() : PcmAudioPlayer {
         const val DRAIN_MARGIN_MS = 500L
     }
 
-    override suspend fun playStream(pcmFlow: Flow<ByteArray>) {
+    override suspend fun play(pcm: Flow<ByteArray>, sampleRateHz: Int) {
         withContext(Dispatchers.IO) {
             stop()                                    // 방어: 이전 세션 정리
-            val session = Session(createTrack())
+            val session = Session(createTrack(sampleRateHz), sampleRateHz)
             current = session
             val track = session.track
 
@@ -43,7 +44,7 @@ internal class AudioTrackPcmPlayer @Inject constructor() : PcmAudioPlayer {
 
             try {
                 track.play()
-                pcmFlow.collect { chunk ->
+                pcm.collect { chunk ->
                     this@withContext.ensureActive()
                     val data = carry?.let { byteArrayOf(it) + chunk } ?: chunk
                     val usable = data.size and 1.inv()
@@ -81,7 +82,7 @@ internal class AudioTrackPcmPlayer @Inject constructor() : PcmAudioPlayer {
     private suspend fun awaitDrained(session: Session, totalFrames: Long) {
         if (totalFrames <= 0) return
         val remainingFrames = totalFrames - playedFrames(session.track)
-        val timeoutMs = remainingFrames.coerceAtLeast(0) * 1000 / SAMPLE_RATE + DRAIN_MARGIN_MS
+        val timeoutMs = remainingFrames.coerceAtLeast(0) * 1000 / session.sampleRateHz + DRAIN_MARGIN_MS
         withTimeoutOrNull(timeoutMs.milliseconds) {
             while (!session.stopped && playedFrames(session.track) < totalFrames) {
                 delay(DRAIN_POLL_MS.milliseconds)
@@ -93,9 +94,9 @@ internal class AudioTrackPcmPlayer @Inject constructor() : PcmAudioPlayer {
         runCatching { track.playbackHeadPosition.toLong() and 0xFFFFFFFFL }
             .getOrDefault(Long.MAX_VALUE)             // 이미 release됐으면 종료로 간주
 
-    private fun createTrack(): AudioTrack {
-        val minBuffer = AudioTrack.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT)
-        val bufferSize = maxOf(minBuffer, SAMPLE_RATE * BYTES_PER_FRAME)   // 약 1초
+    private fun createTrack(sampleRateHz: Int): AudioTrack {
+        val minBuffer = AudioTrack.getMinBufferSize(sampleRateHz, CHANNEL_CONFIG, AUDIO_FORMAT)
+        val bufferSize = maxOf(minBuffer, sampleRateHz * BYTES_PER_FRAME)   // 약 1초
         return AudioTrack.Builder()
             .setAudioAttributes(
                 AudioAttributes.Builder()
@@ -106,7 +107,7 @@ internal class AudioTrackPcmPlayer @Inject constructor() : PcmAudioPlayer {
             .setAudioFormat(
                 AudioFormat.Builder()
                     .setEncoding(AUDIO_FORMAT)
-                    .setSampleRate(SAMPLE_RATE)
+                    .setSampleRate(sampleRateHz)
                     .setChannelMask(CHANNEL_CONFIG)
                     .build()
             )

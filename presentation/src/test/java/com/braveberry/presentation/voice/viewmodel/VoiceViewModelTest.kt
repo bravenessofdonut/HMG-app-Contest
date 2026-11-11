@@ -60,7 +60,7 @@ class VoiceViewModelTest {
         }
     }
 
-    @Test fun geminiCommandsGoThroughUseCasesWithLanguage() = runTest {
+    @Test fun remoteTtsCommandsGoThroughUseCasesWithLanguage() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         try {
             val session = mockk<VoiceSession>(relaxUnitFun = true)
@@ -76,13 +76,13 @@ class VoiceViewModelTest {
                 GetRemoteTtsOptionsUseCase(remoteTtsRepository)
             )
 
-            vm.speakGemini("请系好安全带！", "Kore", "cmn-CN")
-            vm.stopGemini()
+            vm.speakRemote("请系好安全带！", "Kore", "cmn-CN")
+            vm.stopRemote()
 
             verify(exactly = 1) { remoteTtsRepository.speak("请系好安全带！", "Kore", "cmn-CN") }
             verify(exactly = 1) { remoteTtsRepository.stop() }
             // 화면 선택지는 하드코딩이 아니라 구현 모듈의 카탈로그에서 옴.
-            assertEquals(options, vm.geminiOptions)
+            assertEquals(options, vm.remoteTtsOptions)
         } finally {
             Dispatchers.resetMain()
         }

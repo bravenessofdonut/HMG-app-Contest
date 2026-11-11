@@ -11,10 +11,10 @@ fun VoiceRoute(onBack: () -> Unit, viewModel: VoiceViewModel = hiltViewModel()) 
     val state by viewModel.container.stateFlow.collectAsStateWithLifecycle()
     VoiceScreen(
         state = state,
-        geminiOptions = viewModel.geminiOptions,
+        remoteTtsOptions = viewModel.remoteTtsOptions,
         onSpeak = viewModel::speak,
-        onGeminiSpeak = viewModel::speakGemini,
-        onGeminiStop = viewModel::stopGemini,
+        onRemoteSpeak = viewModel::speakRemote,
+        onRemoteStop = viewModel::stopRemote,
         onPreviewDialogue = viewModel::previewDialogue,
         onStopSpeaking = viewModel::stopSpeaking,
         onStartListening = viewModel::startListening,

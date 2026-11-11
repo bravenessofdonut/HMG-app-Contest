@@ -1,4 +1,4 @@
-package com.braveberry.voice.remote.api
+package com.braveberry.voice.remote.model
 
 /**
  * Gemini TTS 응답 part의 형식 확인.
@@ -23,6 +23,3 @@ internal object GeminiAudioFormat {
 /** 재생기가 처리할 수 없는 오디오 형식. 같은 요청에는 같은 형식이 오므로 재시도하지 않음. */
 internal class UnsupportedAudioFormatException(mimeType: String) :
     Exception("Unsupported Gemini audio format: $mimeType")
-
-/** 한 문장의 응답이 끝났지만 오디오 바이트를 받지 못함. */
-internal class EmptyAudioException : Exception("Gemini TTS response contained no audio")

@@ -8,7 +8,7 @@ android {
 }
 
 dependencies {
-    implementation(project(":domain"))
+    implementation(project(":voice-data"))
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.ai)
     implementation(libs.kotlinx.coroutines.core)
