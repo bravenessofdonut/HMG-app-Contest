@@ -18,6 +18,7 @@ plugins {
     id("braveberry.android.application")
     id("braveberry.android.compose")
     id("braveberry.android.hilt")
+    alias(libs.plugins.google.services)
 }
 
 android {
@@ -67,6 +68,12 @@ dependencies {
     implementation(project(":vehicle-local"))
     implementation(project(":voice-data"))
     implementation(project(":voice-local"))
+    implementation(project(":voice-remote"))
+
+    implementation(platform(libs.firebase.bom))
+    // 디버그 provider는 디버그 토큰으로 App Check를 우회하므로 release APK에 포함하지 않음.
+    debugImplementation(libs.firebase.appcheck.debug)
+
     implementation(project(":navi-data"))
     implementation(project(":navi-local"))
 

@@ -4,21 +4,10 @@
     <selectionStates>
       <SelectionState runConfigName="app">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2026-10-28T09:07:00.361894Z">
+        <DropdownSelection timestamp="2026-11-10T13:52:35.743671300Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="LocalEmulator" identifier="path=/Users/minhokim/.android/avd/Pleos_Connect_v2.1.0.avd" />
-            </handle>
-          </Target>
-        </DropdownSelection>
-        <DialogSelection />
-      </SelectionState>
-      <SelectionState runConfigName="Firebase Gemini 스트리밍 통신 테스트()">
-        <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2026-10-28T09:07:00.361894Z">
-          <Target type="DEFAULT_BOOT">
-            <handle>
-              <DeviceId pluginId="LocalEmulator" identifier="path=/Users/minhokim/.android/avd/Pleos_Connect_v2.1.0.avd" />
+              <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\shin\.android\avd\Pleos_Connect_v2.1.0_2.avd" />
             </handle>
           </Target>
         </DropdownSelection>

@@ -1,12 +1,11 @@
 plugins {
-    id("braveberry.android.library")
-    id("braveberry.android.hilt")
+    id("braveberry.jvm.library")
+    id("braveberry.jvm.hilt")
 }
-
-android { namespace = "com.braveberry.voice.data" }
 
 dependencies {
     implementation(project(":domain"))
+    implementation(project(":data-resource"))
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.javax.inject)
 }

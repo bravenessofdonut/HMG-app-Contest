@@ -137,7 +137,7 @@ class VoiceSessionImpl(
         current.value = VoiceSessionState()
         eventJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             try {
-                engine.events.collect { mailbox.send(Command.SdkEvent(epoch, it)) }
+                engine.events.collect { mailbox.send(Command.SdkEvent(epoch, it as VoiceEvent)) }
                 mailbox.send(Command.Broken(epoch, "EVENT_STREAM_CLOSED"))
             } catch (cancel: CancellationException) {
                 throw cancel

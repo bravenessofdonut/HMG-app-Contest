@@ -11,7 +11,10 @@ fun VoiceRoute(onBack: () -> Unit, viewModel: VoiceViewModel = hiltViewModel()) 
     val state by viewModel.container.stateFlow.collectAsStateWithLifecycle()
     VoiceScreen(
         state = state,
+        remoteTtsOptions = viewModel.remoteTtsOptions,
         onSpeak = viewModel::speak,
+        onRemoteSpeak = viewModel::speakRemote,
+        onRemoteStop = viewModel::stopRemote,
         onPreviewDialogue = viewModel::previewDialogue,
         onStopSpeaking = viewModel::stopSpeaking,
         onStartListening = viewModel::startListening,

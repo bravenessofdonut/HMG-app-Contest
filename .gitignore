@@ -19,6 +19,11 @@
 
 # Local configuration
 local.properties
+build/
+
+# Firebase / Secrets
+google-services.json
+**/google-services.json
 *.local.properties
 
 # Firebase
