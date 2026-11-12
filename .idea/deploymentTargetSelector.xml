@@ -13,7 +13,7 @@
         </DropdownSelection>
         <DialogSelection />
       </SelectionState>
-      <SelectionState runConfigName="Firebase Gemini 스트리밍 통신 테스트()">
+      <SelectionState runConfigName="PoiRemoteDataSourceImplTest">
         <option name="selectionMode" value="DROPDOWN" />
         <DropdownSelection timestamp="2026-10-28T09:07:00.361894Z">
           <Target type="DEFAULT_BOOT">
