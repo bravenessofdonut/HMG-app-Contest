@@ -15,7 +15,8 @@ interface GooglePlacesApi {
         apiKey: String,
 
         @Header("X-Goog-FieldMask")
-        fieldMask: String = "places.id,places.location",
+        fieldMask: String =
+            "places.id,places.location,places.formattedAddress",
 
         @Body
         request: PlacesSearchRequestDto

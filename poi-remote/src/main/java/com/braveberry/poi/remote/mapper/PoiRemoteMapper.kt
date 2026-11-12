@@ -10,15 +10,13 @@ fun PlacesSearchResponseDto.toDataModel(): PoiDataModel? {
     val poi = place.id?.takeIf { it.isNotBlank() }
         ?: return null
 
-    val latitude = place.location?.latitude
-        ?: return null
-
-    val longitude = place.location.longitude
-        ?: return null
+    val latitude = place.location?.latitude ?: return null
+    val longitude = place.location.longitude ?: return null
 
     return PoiDataModel(
         poi = poi,
         latitude = latitude,
-        longitude = longitude
+        longitude = longitude,
+        address = place.formattedAddress
     )
 }

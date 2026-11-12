@@ -6,7 +6,8 @@ data class PlacesSearchResponseDto(
 
 data class PlaceDto(
     val id: String? = null,
-    val location: PlaceLocationDto? = null
+    val location: PlaceLocationDto? = null,
+    val formattedAddress: String? = null
 )
 
 data class PlaceLocationDto(

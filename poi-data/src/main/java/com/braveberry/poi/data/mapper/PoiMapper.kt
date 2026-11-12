@@ -7,5 +7,6 @@ fun PoiDataModel.toDomain(): PoiInfo =
     PoiInfo(
         poi = poi,
         latitude = latitude,
-        longitude = longitude
+        longitude = longitude,
+        address = address
     )
