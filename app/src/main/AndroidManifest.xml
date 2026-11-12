@@ -15,6 +15,7 @@
     <uses-permission android:name="pleos.car.permission.NAVI_CUSTOM_MAP" />
     <uses-permission android:name="pleos.car.permission.NAVI_CUSTOM_ROUTE" />
     <uses-permission android:name="pleos.car.permission.NAVI_CUSTOM_ETC" />
+    <uses-permission android:name="pleos.car.permission.FUSED_LOCATION" />
     <uses-feature android:name="android.hardware.type.automotive" android:required="false" />
 
     <application
