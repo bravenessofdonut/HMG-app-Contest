@@ -3,6 +3,7 @@
   <component name="CompilerConfiguration">
     <bytecodeTargetLevel target="11">
       <module name="DrivingApplication.assembly" target="25" />
+      <module name="DrivingApplication.voice-remote" target="25" />
     </bytecodeTargetLevel>
   </component>
 </project>
