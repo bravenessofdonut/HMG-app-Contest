@@ -67,6 +67,8 @@ dependencies {
     implementation(project(":vehicle-local"))
     implementation(project(":voice-data"))
     implementation(project(":voice-local"))
+    implementation(project(":navi-data"))
+    implementation(project(":navi-local"))
 
     // AI 모듈: 실제 앱에도 포함
     implementation(project(":ai-data"))
