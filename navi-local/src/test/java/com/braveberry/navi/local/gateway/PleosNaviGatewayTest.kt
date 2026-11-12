@@ -1,10 +1,13 @@
 package com.braveberry.navi.local.gateway
 
+import ai.pleos.playground.navi.data.RequestWaypointInfo
+import ai.pleos.playground.navi.data.RouteWithWaypointsRequest
 import ai.pleos.playground.navi.helper.NaviHelper
 import com.braveberry.navi.data.model.NaviInstruction
 import com.braveberry.navi.data.model.NaviPlaceData
 import com.braveberry.navi.data.model.NaviSignalType
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.verify
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -53,6 +56,24 @@ class PleosNaviGatewayTest {
         gateway.release()
         verify(exactly = 1) { helper.removeListener(gateway) }
         verify(exactly = 1) { helper.release() }
+    }
+
+    @Test fun googlePoiIdAndProviderReachWaypointSdkRequests() {
+        val googleWaypoint = destination.copy(poiId = "ChIJ_test_place_id", poiProvider = "Google")
+        gateway.initialize { }
+
+        gateway.execute(NaviInstruction.Route(destination, listOf(googleWaypoint)))
+        val routeRequest = slot<RouteWithWaypointsRequest>()
+        verify(exactly = 1) { helper.requestRouteWithWaypoints(capture(routeRequest)) }
+        assertEquals("Google", routeRequest.captured.waypoints.single().poiProvider)
+        assertEquals("ChIJ_test_place_id", routeRequest.captured.waypoints.single().poiId)
+
+        gateway.execute(NaviInstruction.AddFirstWaypoint(googleWaypoint))
+        val waypointRequest = slot<RequestWaypointInfo>()
+        verify(exactly = 1) { helper.addWaypoint(capture(waypointRequest)) }
+        assertEquals("Google", waypointRequest.captured.poiProvider)
+        assertEquals("ChIJ_test_place_id", waypointRequest.captured.poiId)
+        gateway.release()
     }
 
     @Test fun callbacksAreForwardedAndDuplicateSpeedLimitsIgnored() {

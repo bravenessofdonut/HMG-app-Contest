@@ -117,7 +117,8 @@ internal class PleosNaviGateway(private val helper: NaviHelper) : NaviGateway, N
         poiId = poiId,
         poiName = poiName,
         poiSubId = poiSubId,
-        address = address
+        address = address,
+        poiProvider = poiProvider
     )
 
     private fun NaviPlaceData.toTripRequest() = TripRequest(

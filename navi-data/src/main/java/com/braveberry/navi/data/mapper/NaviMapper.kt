@@ -8,7 +8,7 @@ import com.braveberry.navi.data.model.NaviInstruction
 import com.braveberry.navi.data.model.NaviPlaceData
 import com.braveberry.navi.data.model.NaviSignal
 
-internal fun NaviPlace.toData() = NaviPlaceData(latitude, longitude, poiId, poiName, poiSubId, address)
+internal fun NaviPlace.toData() = NaviPlaceData(latitude, longitude, poiId, poiName, poiSubId, address, poiProvider)
 
 internal fun NaviCommand.toInstruction(): NaviInstruction = when (this) {
     is NaviCommand.RequestRoute -> NaviInstruction.Route(destination.toData(), waypoints.map { it.toData() })

@@ -32,6 +32,17 @@ class NaviRepositoryImplTest {
         assertEquals(NaviInstruction.Route(point.toDataForTest(), listOf(point.toDataForTest())), source.lastCommand)
     }
 
+    @Test fun googleProviderIsPreservedForWaypoint() = runTest {
+        val source = FakeSource()
+        val waypoint = point.copy(poiId = "ChIJ_test_place_id", poiProvider = "Google")
+        NaviRepositoryImpl(source).execute(NaviCommand.RequestRoute(point, listOf(waypoint))).toList()
+
+        val route = source.lastCommand as NaviInstruction.Route
+        assertEquals("Google", route.waypoints.single().poiProvider)
+        assertEquals("ChIJ_test_place_id", route.waypoints.single().poiId)
+        assertEquals("", route.destination.poiProvider)
+    }
+
     @Test fun serviceCommandsAreLazyAndIndependent() = runTest {
         val source = FakeSource()
         val repo = NaviRepositoryImpl(source)
@@ -80,7 +91,7 @@ class NaviRepositoryImplTest {
     }
 
     private fun NaviPlace.toDataForTest() = com.braveberry.navi.data.model.NaviPlaceData(
-        latitude, longitude, poiId, poiName, poiSubId, address
+        latitude, longitude, poiId, poiName, poiSubId, address, poiProvider
     )
 
     private class FakeSource : NaviDataSource {

@@ -6,7 +6,8 @@ data class NaviPlace(
     val poiId: String,
     val poiName: String,
     val poiSubId: String = "0",
-    val address: String = ""
+    val address: String = "",
+    val poiProvider: String = ""
 ) {
     init {
         require(latitude.isFinite() && latitude in -90.0..90.0) { "Invalid latitude" }

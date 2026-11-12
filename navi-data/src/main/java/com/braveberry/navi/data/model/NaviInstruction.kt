@@ -6,7 +6,8 @@ data class NaviPlaceData(
     val poiId: String,
     val poiName: String,
     val poiSubId: String,
-    val address: String
+    val address: String,
+    val poiProvider: String = ""
 )
 
 sealed interface NaviInstruction {
