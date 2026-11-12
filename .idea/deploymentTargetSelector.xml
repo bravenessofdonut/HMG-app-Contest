@@ -13,7 +13,7 @@
         </DropdownSelection>
         <DialogSelection />
       </SelectionState>
-      <SelectionState runConfigName="Firebase Gemini 스트리밍 통신 테스트()">
+      <SelectionState runConfigName="PoiRemoteDataSourceImplTest">
         <option name="selectionMode" value="DROPDOWN" />
         <DropdownSelection timestamp="2026-10-28T09:07:00.361894Z">
           <Target type="DEFAULT_BOOT">
@@ -22,6 +22,10 @@
             </handle>
           </Target>
         </DropdownSelection>
+        <DialogSelection />
+      </SelectionState>
+      <SelectionState runConfigName="경복궁 검색 시 Google Place ID와 좌표를 반환한다()">
+        <option name="selectionMode" value="DROPDOWN" />
         <DialogSelection />
       </SelectionState>
     </selectionStates>

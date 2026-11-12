@@ -76,6 +76,11 @@ dependencies {
 
     implementation(project(":location-data"))
     implementation(project(":location-local"))
+    // poi 가져옴
+
+    implementation(project(":poi-data"))
+    implementation(project(":poi-remote"))
+
     implementation(libs.androidx.hilt.navigation.compose)
 
     // 기존 Android 테스트
